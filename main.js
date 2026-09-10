@@ -31,7 +31,7 @@ scene.background = new THREE.Color(0xc7ccd1);
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
 // Rotated 90 degrees to the right from the original (-0.32, 0.83, 0.97)
 // framing, orbiting around the vertical (Y) axis at the same height/distance.
-camera.position.set(0.97, 0.83, 0.32);
+camera.position.set(0, 0.7, 2.5);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
