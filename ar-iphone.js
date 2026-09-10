@@ -120,11 +120,25 @@
         scene.add(arGroup);
 
         setOverlayText('Loading gantry model...');
-
         const gltfLoader = new THREE.GLTFLoader();
+        const loadStartedAt = Date.now();
+        let lastProgressAt = Date.now();
+
+        // If no progress event fires for a while, the load is likely
+        // genuinely stalled (network/CORS issue) rather than just slow -
+        // let the person testing know, instead of a silent infinite spinner.
+        const stallCheckInterval = setInterval(() => {
+          const secsSinceProgress = Math.round((Date.now() - lastProgressAt) / 1000);
+          const secsTotal = Math.round((Date.now() - loadStartedAt) / 1000);
+          if (secsSinceProgress > 8) {
+            setOverlayText(`Still loading... ${secsTotal}s elapsed, no progress for ${secsSinceProgress}s. Model may be stalled - check your connection.`);
+          }
+        }, 2000);
+
         gltfLoader.load(
           cfg.MODEL_URL,
           (gltf) => {
+            clearInterval(stallCheckInterval);
             const model = gltf.scene;
 
             model.traverse((child) => {
@@ -143,10 +157,23 @@
             arGroup.add(model);
             setOverlayText('Move your phone to find a surface, then tap it.');
           },
-          undefined,
+          (xhr) => {
+            lastProgressAt = Date.now();
+            if (xhr.lengthComputable) {
+              const pct = Math.round((xhr.loaded / xhr.total) * 100);
+              const mb = (xhr.total / 1024 / 1024).toFixed(1);
+              setOverlayText(`Loading gantry model... ${pct}% (${mb}MB total)`);
+              console.log(`[AR] Model load progress: ${pct}% (${xhr.loaded}/${xhr.total} bytes)`);
+            } else {
+              const mbLoaded = (xhr.loaded / 1024 / 1024).toFixed(1);
+              setOverlayText(`Loading gantry model... ${mbLoaded}MB loaded`);
+              console.log(`[AR] Model load progress: ${xhr.loaded} bytes (total size unknown)`);
+            }
+          },
           (error) => {
+            clearInterval(stallCheckInterval);
             console.error('[AR] Failed to load GLB model:', error);
-            setOverlayText('Failed to load 3D model.');
+            setOverlayText(`Failed to load 3D model: ${error && error.message ? error.message : 'unknown error'}`);
           }
         );
 
