@@ -27,7 +27,7 @@ const testCubePipelineModule = () => {
       scene.add(light);
       scene.add(new THREE.AmbientLight(0xffffff, 0.6));
 
-      const geometry = new THREE.BoxGeometry(0.1, 0.1, 0.1); // 10cm cube
+      const geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5); // 10cm cube
       const material = new THREE.MeshStandardMaterial({ color: 0x0091ff });
       cube = new THREE.Mesh(geometry, material);
       cube.visible = false;
