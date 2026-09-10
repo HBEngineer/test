@@ -77,7 +77,7 @@ const testCubePipelineModule = () => {
 // canvas again after our first pass already ran.
 // ==========================================
 
-(*
+/*
 const getViewportSize = () => {
   if (window.visualViewport) {
     return { width: window.visualViewport.width, height: window.visualViewport.height };
@@ -132,4 +132,4 @@ const onxrloaded = () => {
 
 window.XR8 ? onxrloaded() : window.addEventListener('xrloaded', onxrloaded);
 
-*)
+*/
