@@ -1,49 +1,252 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>8th Wall Test - Tap to Place</title>
-  <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-      height: 100%;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    }
-    #camerafeed {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-    }
-    #status {
-      position: absolute;
-      top: 20px;
-      left: 20px;
-      right: 20px;
-      z-index: 10;
-      background: rgba(0, 0, 0, 0.7);
-      color: #ffffff;
-      padding: 10px 16px;
-      border-radius: 8px;
-      font-size: 14px;
-      text-align: center;
-    }
-  </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HGO Sydney Gantry Digital Twin</title>
 
-  <!-- three.js (global/UMD build - 8th Wall's Threejs module expects a global THREE, not an ES module) -->
+  <!-- Favicon -->
+  <link rel="shortcut icon" href="./favicon.ico" />
+
+  <!-- Relative CSS link -->
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- Three.js Core & Addons (ES modules — ARButton is only ever published
+       as a module, so the whole three.js stack must load this way too) -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <!-- MQTT Client -->
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+
+  <!-- iPhone AR (8th Wall) - a classic global THREE build, since 8th Wall's
+       Three.js integration expects window.THREE, not an ES module. This is
+       a SEPARATE THREE.js instance from the one used everywhere else in
+       this app (via the importmap above) - they don't interoperate, which
+       is why ar-iphone.js loads its own independent copy of the model. -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-
-  <!-- 8th Wall Engine (open source, no login/API key required) -->
+  <script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/js/loaders/GLTFLoader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
-
-  <script src="./app.js" defer></script>
 </head>
 <body>
-  <canvas id="camerafeed"></canvas>
-  <div id="status">Loading...</div>
+
+  <!-- Status Overlay -->
+  <div id="status-card">
+    <div class="status-header">
+      <span id="dot"></span>
+      <strong id="status">Connecting...</strong>
+    </div>
+    <div><strong>Pos X:</strong> <span id="val-x">0 mm</span></div>
+    <div><strong>Pos Y:</strong> <span id="val-y">0 mm</span></div>
+    <div><strong>Pos Z:</strong> <span id="val-z">0 mm</span></div>
+  </div>
+
+  <!-- Retractable Lighting Panel -->
+  <div id="light-panel" class="collapsed">
+  <div id="light-panel-header">
+  <span>Lighting Controls</span>
+  <span id="toggle-icon">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="6 9 12 15 18 9"></polyline>
+    </svg>
+  </span>
+</div>
+    <div id="light-panel-body">
+
+      <!-- Hemisphere Light -->
+      <div class="control-section">
+        <div class="control-section-title">Hemisphere Light</div>
+        <div class="control-group">
+          <label for="ctrl-hemi">Intensity: <span id="lbl-hemi">0.7</span></label>
+          <input type="range" id="ctrl-hemi" min="0" max="10" step="0.1" value="0.7" />
+        </div>
+        <div class="control-group position-group">
+          <label>Position</label>
+          <div class="xyz-row">
+            <div class="xyz-field">
+              <span class="xyz-label">X</span>
+              <input type="range" id="ctrl-hemi-x" min="-20" max="20" step="0.5" value="20" />
+              <span class="xyz-value" id="lbl-hemi-x">20</span>
+            </div>
+            <div class="xyz-field">
+              <span class="xyz-label">Y</span>
+              <input type="range" id="ctrl-hemi-y" min="-20" max="20" step="0.5" value="20" />
+              <span class="xyz-value" id="lbl-hemi-y">20</span>
+            </div>
+            <div class="xyz-field">
+              <span class="xyz-label">Z</span>
+              <input type="range" id="ctrl-hemi-z" min="-20" max="20" step="0.5" value="20" />
+              <span class="xyz-value" id="lbl-hemi-z">20</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <hr class="section-divider" />
+
+      <!-- Key Light -->
+      <div class="control-section">
+        <div class="control-section-title">Key Light</div>
+        <div class="control-group">
+          <label for="ctrl-key">Intensity: <span id="lbl-key">2.0</span></label>
+          <input type="range" id="ctrl-key" min="0" max="10" step="0.1" value="2.0" />
+        </div>
+        <div class="control-group">
+          <label for="ctrl-key-color">Color</label>
+          <input type="color" id="ctrl-key-color" value="#ffffff" />
+        </div>
+        <div class="control-group position-group">
+          <label>Position</label>
+          <div class="xyz-row">
+            <div class="xyz-field">
+              <span class="xyz-label">X</span>
+              <input type="range" id="ctrl-key-x" min="-20" max="20" step="0.1" value="4" />
+              <span class="xyz-value" id="lbl-key-x">4</span>
+            </div>
+            <div class="xyz-field">
+              <span class="xyz-label">Y</span>
+              <input type="range" id="ctrl-key-y" min="-20" max="20" step="0.1" value="6" />
+              <span class="xyz-value" id="lbl-key-y">6</span>
+            </div>
+            <div class="xyz-field">
+              <span class="xyz-label">Z</span>
+              <input type="range" id="ctrl-key-z" min="-20" max="20" step="0.1" value="4" />
+              <span class="xyz-value" id="lbl-key-z">4</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <hr class="section-divider" />
+
+      <!-- Fill Light -->
+      <div class="control-section">
+        <div class="control-section-title">Fill Light</div>
+        <div class="control-group">
+          <label for="ctrl-fill">Intensity: <span id="lbl-fill">2.0</span></label>
+          <input type="range" id="ctrl-fill" min="0" max="10" step="0.1" value="2.0" />
+        </div>
+        <div class="control-group">
+          <label for="ctrl-fill-color">Color</label>
+          <input type="color" id="ctrl-fill-color" value="#ffffff" />
+        </div>
+        <div class="control-group position-group">
+          <label>Position</label>
+          <div class="xyz-row">
+            <div class="xyz-field">
+              <span class="xyz-label">X</span>
+              <input type="range" id="ctrl-fill-x" min="-20" max="20" step="0.1" value="-4" />
+              <span class="xyz-value" id="lbl-fill-x">-4</span>
+            </div>
+            <div class="xyz-field">
+              <span class="xyz-label">Y</span>
+              <input type="range" id="ctrl-fill-y" min="-20" max="20" step="0.1" value="3" />
+              <span class="xyz-value" id="lbl-fill-y">3</span>
+            </div>
+            <div class="xyz-field">
+              <span class="xyz-label">Z</span>
+              <input type="range" id="ctrl-fill-z" min="-20" max="20" step="0.1" value="-3" />
+              <span class="xyz-value" id="lbl-fill-z">-3</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <hr class="section-divider" />
+
+      <!-- Ambient Light -->
+      <div class="control-section">
+        <div class="control-section-title">Ambient Light</div>
+        <div class="control-group">
+          <label for="ctrl-ambient">Intensity: <span id="lbl-ambient">1.0</span></label>
+          <input type="range" id="ctrl-ambient" min="0" max="5" step="0.1" value="1.0" />
+        </div>
+        <div class="control-group">
+          <label for="ctrl-ambient-color">Color</label>
+          <input type="color" id="ctrl-ambient-color" value="#ffffff" />
+        </div>
+      </div>
+
+      <hr class="section-divider" />
+
+      <!-- Scene Background -->
+      <div class="control-section">
+        <div class="control-section-title">Scene</div>
+        <div class="control-group">
+          <label for="ctrl-bg-color">Background Color</label>
+          <input type="color" id="ctrl-bg-color" value="#c7ccd1" />
+        </div>
+      </div>
+
+      <hr class="section-divider" />
+
+      <!-- Save / Reset Controls -->
+      <div class="control-section">
+        <div class="button-row">
+          <button id="btn-save-default" class="btn btn-primary">Save as Default</button>
+        </div>
+        <div class="button-row">
+          <button id="btn-load-default" class="btn btn-secondary">Reset to Saved Default</button>
+          <button id="btn-load-factory" class="btn btn-secondary">Reset to Factory</button>
+        </div>
+        <div id="save-status" class="save-status"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- iOS AR Quick Look Button (static preview - ARKit, no live MQTT data) -->
+  <a id="ios-ar-btn" class="ios-ar-button" rel="ar" href="./model/hgosydney_Kinetic.usdz">
+    <img src="https://developer.apple.com/ar/3d/glTF/AR_icon.png" width="18" height="18" alt="AR" />
+    <span>View in AR (iOS)</span>
+  </a>
+
+  <!-- iOS Live AR Button (8th Wall - camera-based SLAM, live MQTT data) -->
+  <button id="ios-live-ar-btn" class="ios-ar-button ios-live-ar-button">
+    <span>Start Live AR (Beta)</span>
+  </button>
+
+  <!-- 3D Canvas Container -->
+  <div id="canvas-container"></div>
+
+  <!-- Android WebXR AR Scanning Overlay -->
+  <div id="ar-scan-overlay" class="ar-scan-overlay">
+    <div class="ar-scan-card">
+      <div class="ar-spinner"></div>
+      <div id="ar-scan-text" class="ar-scan-text">Starting AR...</div>
+    </div>
+  </div>
+
+  <!-- iPhone Live AR (8th Wall) - camera feed + UI, hidden until started -->
+  <canvas id="camerafeed" style="display: none;"></canvas>
+  <div id="ios-ar-scan-overlay" class="ar-scan-overlay">
+    <div class="ar-scan-card">
+      <div class="ar-spinner"></div>
+      <div id="ios-ar-scan-text" class="ar-scan-text">Starting AR...</div>
+    </div>
+  </div>
+  <button id="ios-ar-exit-btn" class="ios-ar-exit-button" style="display: none;">Exit AR</button>
+
+  <!-- iOS Detection -->
+  <script>
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    if (isIOS) {
+      document.getElementById('ios-ar-btn').style.display = 'flex';
+      document.getElementById('ios-live-ar-btn').style.display = 'flex';
+    }
+  </script>
+
+  <!-- Main Application Script -->
+  <script type="module" src="./main.js"></script>
+
+  <!-- iPhone Live AR Script (classic, non-module - needs global THREE/XR8) -->
+  <script src="./ar-iphone.js" defer></script>
+
 </body>
 </html>

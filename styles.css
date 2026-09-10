@@ -1,0 +1,397 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  overflow: hidden;
+  background-color: #f4f6f9;
+}
+
+#canvas-container {
+  width: 100vw;
+  height: 100vh; /* fallback for browsers without dvh support */
+  height: 100dvh; /* accounts for mobile browser toolbars showing/hiding */
+  display: block;
+}
+
+/* Status Overlay */
+#status-card {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 15px 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(4px);
+}
+
+.status-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+#dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #ff9800;
+  display: inline-block;
+}
+
+#status {
+  color: #e65100; /* default "connecting" color; overridden by JS on connect */
+}
+
+/* Custom WebXR AR Button Style */
+#ARButton {
+  position: absolute !important;
+  bottom: 30px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  padding: 12px 24px !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  border-radius: 30px !important;
+  background: #0066cc !important;
+  color: #ffffff !important;
+  font-family: sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.5px !important;
+  box-shadow: 0 4px 15px rgba(0, 102, 204, 0.4) !important;
+  cursor: pointer !important;
+  z-index: 999 !important;
+  transition: background 0.2s ease, transform 0.2s ease !important;
+}
+
+#ARButton:hover {
+  background: #0052a3 !important;
+}
+
+/* iOS AR Quick Look Button */
+.ios-ar-button {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 12px 24px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 20px;
+  background: rgba(0, 0, 0, 0.8);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  display: none; /* shown via JS only when iOS is detected */
+}
+
+/* Retractable Lighting Control Panel */
+#light-panel {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(4px);
+  width: 240px;
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+#light-panel-header {
+  padding: 12px 16px;
+  background: rgba(240, 240, 240, 0.9);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  font-size: 14px;
+  user-select: none;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+#light-panel-body {
+  padding: 15px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 80vh;
+  overflow-y: auto;
+  transition: max-height 0.3s ease, opacity 0.3s ease;
+  opacity: 1;
+}
+
+#light-panel.collapsed #light-panel-body {
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+#toggle-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s ease;
+}
+
+#light-panel.collapsed #toggle-icon {
+  transform: rotate(180deg);
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.control-group label {
+  display: flex;
+  justify-content: space-between;
+  color: #333;
+}
+
+.control-group input[type="range"] {
+  width: 100%;
+  cursor: pointer;
+}
+
+.control-group input[type="color"] {
+  border: none;
+  width: 100%;
+  height: 28px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.control-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.control-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #0066cc;
+}
+
+.section-divider {
+  border: none;
+  border-top: 1px solid #e0e0e0;
+  margin: 2px 0;
+}
+
+.position-group label {
+  justify-content: flex-start;
+}
+
+.xyz-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.xyz-field {
+  display: grid;
+  grid-template-columns: 14px 1fr 40px;
+  align-items: center;
+  gap: 6px;
+}
+
+.xyz-label {
+  font-weight: 600;
+  color: #666;
+  font-size: 11px;
+}
+
+.xyz-value {
+  font-family: monospace;
+  font-size: 11px;
+  text-align: right;
+  color: #444;
+}
+
+.button-row {
+  display: flex;
+  gap: 8px;
+}
+
+.btn {
+  flex: 1;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.1s ease;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn-primary {
+  background: #0066cc;
+  color: #ffffff;
+}
+
+.btn-primary:hover {
+  background: #0052a3;
+}
+
+.btn-secondary {
+  background: #eef2f7;
+  color: #333;
+}
+
+.btn-secondary:hover {
+  background: #dfe6ee;
+}
+
+.save-status {
+  font-size: 11px;
+  color: #2e7d32;
+  min-height: 14px;
+  text-align: center;
+}
+
+/* Mobile: shrink and constrain the corner panels so they don't overwhelm
+   a narrow screen or overlap each other. */
+@media (max-width: 600px) {
+  #status-card {
+    top: 12px;
+    left: 12px;
+    min-width: 0;
+    max-width: calc(50vw - 18px);
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+
+  #light-panel {
+    top: 12px;
+    right: 12px;
+    width: calc(50vw - 18px);
+    max-width: 240px;
+  }
+
+  #light-panel-header {
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+
+  #light-panel-body {
+    padding: 12px;
+    max-height: 70vh;
+  }
+}
+
+/* Android WebXR AR Scanning Overlay */
+.ar-scan-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 998; /* below the AR button (999), above the canvas */
+  display: none; /* toggled to flex via JS during an active AR session */
+  align-items: center;
+  justify-content: center;
+  pointer-events: none; /* never blocks taps meant for surface placement */
+}
+
+.ar-scan-overlay.visible {
+  display: flex;
+}
+
+.ar-scan-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 22px 28px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  border-radius: 16px;
+  color: #ffffff;
+}
+
+.ar-spinner {
+  width: 34px;
+  height: 34px;
+  border: 3px solid rgba(255, 255, 255, 0.25);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: ar-spin 0.8s linear infinite;
+}
+
+@keyframes ar-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.ar-scan-text {
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  max-width: 220px;
+}
+
+/* iPhone Live AR (8th Wall) */
+
+.ios-live-ar-button {
+  bottom: 76px; /* stacked above the static Quick Look button */
+  background: rgba(0, 145, 255, 0.9); /* distinct color from Quick Look, so they're not mistaken for the same action */
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+#camerafeed {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 2000; /* above everything else in the normal app UI */
+}
+
+#ios-ar-scan-overlay {
+  z-index: 2001;
+}
+
+.ios-ar-exit-button {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 2002;
+  padding: 10px 18px;
+  border: none;
+  border-radius: 20px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+
+
