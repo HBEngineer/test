@@ -34,8 +34,9 @@ const testCubePipelineModule = () => {
       scene.add(cube);
 
       canvas.addEventListener('touchstart', (e) => {
-        const x = e.touches[0].clientX / window.innerWidth;
-        const y = e.touches[0].clientY / window.innerHeight;
+        const { width, height } = getViewportSize();
+        const x = e.touches[0].clientX / width;
+        const y = e.touches[0].clientY / height;
         const results = XR8.XrController.hitTest(x, y, ['FEATURE_POINT']);
 
         if (results.length > 0) {
@@ -60,6 +61,12 @@ const testCubePipelineModule = () => {
 // camera feed/3D content only occupies a small native-resolution area
 // while the rest of the (CSS-stretched) canvas stays blank.
 //
+// Uses the Visual Viewport API rather than window.innerWidth/innerHeight -
+// this reports the actual visible rendering area more consistently across
+// mobile browsers (window.inner* behaved differently in Chrome on iOS vs
+// Safari/Edge in testing, even though all three run on the same underlying
+// WebKit engine on iOS).
+//
 // The CSS width/height are set with !important so nothing 8th Wall does
 // internally can silently override them afterward (an inline !important
 // style always wins over a later inline style without one). The numeric
@@ -69,19 +76,30 @@ const testCubePipelineModule = () => {
 // asynchronously (after camera permission is granted) and may resize the
 // canvas again after our first pass already ran.
 // ==========================================
+const getViewportSize = () => {
+  if (window.visualViewport) {
+    return { width: window.visualViewport.width, height: window.visualViewport.height };
+  }
+  return { width: window.innerWidth, height: window.innerHeight };
+};
+
 const resizeCanvasToWindow = () => {
   const canvas = document.getElementById('camerafeed');
   if (!canvas) return;
+  const { width, height } = getViewportSize();
   const dpr = window.devicePixelRatio || 1;
-  canvas.width = window.innerWidth * dpr;
-  canvas.height = window.innerHeight * dpr;
-  canvas.style.setProperty('width', window.innerWidth + 'px', 'important');
-  canvas.style.setProperty('height', window.innerHeight + 'px', 'important');
+  canvas.width = width * dpr;
+  canvas.height = height * dpr;
+  canvas.style.setProperty('width', width + 'px', 'important');
+  canvas.style.setProperty('height', height + 'px', 'important');
   canvas.style.setProperty('position', 'absolute', 'important');
   canvas.style.setProperty('top', '0', 'important');
   canvas.style.setProperty('left', '0', 'important');
 };
 window.addEventListener('resize', resizeCanvasToWindow);
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', resizeCanvasToWindow);
+}
 
 const startResizeSafetyNet = () => {
   const start = Date.now();
