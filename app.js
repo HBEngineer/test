@@ -52,7 +52,25 @@ const testCubePipelineModule = () => {
   };
 };
 
+// ==========================================
+// Ensure the canvas's actual WebGL drawing buffer matches the full screen
+// resolution, not just its CSS display size. Without this, the rendered
+// camera feed/3D content only occupies a small native-resolution area
+// while the rest of the (CSS-stretched) canvas stays blank.
+// ==========================================
+const resizeCanvasToWindow = () => {
+  const canvas = document.getElementById('camerafeed');
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = window.innerWidth * dpr;
+  canvas.height = window.innerHeight * dpr;
+  canvas.style.width = window.innerWidth + 'px';
+  canvas.style.height = window.innerHeight + 'px';
+};
+window.addEventListener('resize', resizeCanvasToWindow);
+
 const onxrloaded = () => {
+  resizeCanvasToWindow(); // set correct resolution before the engine starts
+
   XR8.addCameraPipelineModules([
     XR8.GlTextureRenderer.pipelineModule(), // draws the camera feed
     XR8.Threejs.pipelineModule(),           // creates the AR three.js scene
@@ -64,6 +82,8 @@ const onxrloaded = () => {
     canvas: document.getElementById('camerafeed'),
     allowedDevices: XR8.XrConfig.device().ANY,
   });
+
+  resizeCanvasToWindow(); // safety net in case XR8.run() reset canvas dimensions
 };
 
 window.XR8 ? onxrloaded() : window.addEventListener('xrloaded', onxrloaded);
