@@ -17,6 +17,8 @@ const testCubePipelineModule = () => {
     name: 'test-cube-placer',
 
     onStart: ({ canvas }) => {
+      resizeCanvasToWindow(); // canvas/camera confirmed ready at this point
+
       const { scene } = XR8.Threejs.xrScene();
 
       // Basic lighting so the cube is actually visible against the camera feed
@@ -57,16 +59,37 @@ const testCubePipelineModule = () => {
 // resolution, not just its CSS display size. Without this, the rendered
 // camera feed/3D content only occupies a small native-resolution area
 // while the rest of the (CSS-stretched) canvas stays blank.
+//
+// The CSS width/height are set with !important so nothing 8th Wall does
+// internally can silently override them afterward (an inline !important
+// style always wins over a later inline style without one). The numeric
+// canvas.width/height (the actual drawing buffer, not a CSS property) has
+// no such protection, so this gets re-applied repeatedly for a few seconds
+// after startup too, since 8th Wall's own camera/canvas setup finishes
+// asynchronously (after camera permission is granted) and may resize the
+// canvas again after our first pass already ran.
 // ==========================================
 const resizeCanvasToWindow = () => {
   const canvas = document.getElementById('camerafeed');
+  if (!canvas) return;
   const dpr = window.devicePixelRatio || 1;
   canvas.width = window.innerWidth * dpr;
   canvas.height = window.innerHeight * dpr;
-  canvas.style.width = window.innerWidth + 'px';
-  canvas.style.height = window.innerHeight + 'px';
+  canvas.style.setProperty('width', window.innerWidth + 'px', 'important');
+  canvas.style.setProperty('height', window.innerHeight + 'px', 'important');
+  canvas.style.setProperty('position', 'absolute', 'important');
+  canvas.style.setProperty('top', '0', 'important');
+  canvas.style.setProperty('left', '0', 'important');
 };
 window.addEventListener('resize', resizeCanvasToWindow);
+
+const startResizeSafetyNet = () => {
+  const start = Date.now();
+  const interval = setInterval(() => {
+    resizeCanvasToWindow();
+    if (Date.now() - start > 5000) clearInterval(interval); // stop after 5s
+  }, 250);
+};
 
 const onxrloaded = () => {
   resizeCanvasToWindow(); // set correct resolution before the engine starts
@@ -83,7 +106,8 @@ const onxrloaded = () => {
     allowedDevices: XR8.XrConfig.device().ANY,
   });
 
-  resizeCanvasToWindow(); // safety net in case XR8.run() reset canvas dimensions
+  resizeCanvasToWindow();   // immediate safety net
+  startResizeSafetyNet();   // repeated safety net while camera/canvas finish async setup
 };
 
 window.XR8 ? onxrloaded() : window.addEventListener('xrloaded', onxrloaded);
