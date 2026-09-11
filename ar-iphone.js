@@ -29,6 +29,37 @@
   let modulesAdded = false;
   let resizeSafetyNetInterval = null;
 
+  // --- Capture OUR OWN loaded THREE/GLTFLoader reference immediately,
+  // rather than reading window.THREE fresh later inside onStart. The 8th
+  // Wall engine script loads with `async`, so it can finish loading and
+  // execute at an unpredictable time - including AFTER our classic
+  // three.min.js/GLTFLoader.js tags have already run. If 8th Wall's engine
+  // bundles its own internal Three.js and assigns it to window.THREE
+  // (overwriting ours), reading window.THREE late inside onStart would
+  // silently get their instance instead of ours, which never had
+  // GLTFLoader attached. Capturing early and holding the reference via
+  // closure sidesteps that entirely. ---
+  let CapturedTHREE = null;
+  let CapturedGLTFLoader = null;
+
+  const captureThreeReferences = () => {
+    if (window.THREE && typeof window.THREE.GLTFLoader === 'function') {
+      CapturedTHREE = window.THREE;
+      CapturedGLTFLoader = window.THREE.GLTFLoader;
+      return true;
+    }
+    return false;
+  };
+
+  if (!captureThreeReferences()) {
+    // Not ready yet at the moment this script ran - poll briefly in case
+    // our scripts are still finishing up.
+    const captureInterval = setInterval(() => {
+      if (captureThreeReferences()) clearInterval(captureInterval);
+    }, 50);
+    setTimeout(() => clearInterval(captureInterval), 5000);
+  }
+
   const setOverlayText = (text) => {
     if (overlayText) overlayText.innerText = text;
   };
@@ -102,8 +133,8 @@
             return;
           }
 
-          if (!window.THREE || typeof THREE.GLTFLoader !== 'function') {
-            console.error('[AR] THREE.GLTFLoader is not available - the GLTFLoader script may have failed to load.');
+          if (!CapturedTHREE || !CapturedGLTFLoader) {
+            console.error('[AR] Our own THREE/GLTFLoader reference was never captured - the classic script tags may have failed to load, or window.THREE was overwritten before we captured it.');
             setOverlayText('Error: 3D model loader not available. Check your connection and reload.');
             return;
           }
@@ -114,26 +145,26 @@
           // lights, since this is a separate THREE instance. Matches the
           // same values as main.js's current defaults; if you retune the
           // lighting there, update these to match.
-          const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.7);
+          const hemi = new CapturedTHREE.HemisphereLight(0xffffff, 0x444444, 0.7);
           hemi.position.set(20, 20, 20);
           scene.add(hemi);
 
-          const key = new THREE.DirectionalLight(0xffffff, 2.0);
+          const key = new CapturedTHREE.DirectionalLight(0xffffff, 2.0);
           key.position.set(4, 6, 4);
           scene.add(key);
 
-          const fill = new THREE.DirectionalLight(0xffffff, 2.0);
+          const fill = new CapturedTHREE.DirectionalLight(0xffffff, 2.0);
           fill.position.set(-4, 3, -3);
           scene.add(fill);
 
-          scene.add(new THREE.AmbientLight(0xffffff, 1));
+          scene.add(new CapturedTHREE.AmbientLight(0xffffff, 1));
 
-          arGroup = new THREE.Group();
+          arGroup = new CapturedTHREE.Group();
           arGroup.visible = false;
           scene.add(arGroup);
 
           setOverlayText('Loading gantry model...');
-          const gltfLoader = new THREE.GLTFLoader();
+          const gltfLoader = new CapturedGLTFLoader();
           const loadStartedAt = Date.now();
           let lastProgressAt = Date.now();
 
