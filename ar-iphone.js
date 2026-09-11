@@ -92,107 +92,124 @@
       name: 'gantry-ar-placer',
 
       onStart: ({ canvas: pipelineCanvas }) => {
-        resizeCanvasToWindow();
+        try {
+          resizeCanvasToWindow();
 
-        const cfg = window.GANTRY_CONFIG;
-        const { scene } = XR8.Threejs.xrScene();
-
-        // Lighting for this scene - independent of the desktop scene's
-        // lights, since this is a separate THREE instance. Matches the
-        // same values as main.js's current defaults; if you retune the
-        // lighting there, update these to match.
-        const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.7);
-        hemi.position.set(20, 20, 20);
-        scene.add(hemi);
-
-        const key = new THREE.DirectionalLight(0xffffff, 2.0);
-        key.position.set(4, 6, 4);
-        scene.add(key);
-
-        const fill = new THREE.DirectionalLight(0xffffff, 2.0);
-        fill.position.set(-4, 3, -3);
-        scene.add(fill);
-
-        scene.add(new THREE.AmbientLight(0xffffff, 1));
-
-        arGroup = new THREE.Group();
-        arGroup.visible = false;
-        scene.add(arGroup);
-
-        setOverlayText('Loading gantry model...');
-        const gltfLoader = new THREE.GLTFLoader();
-        const loadStartedAt = Date.now();
-        let lastProgressAt = Date.now();
-
-        // If no progress event fires for a while, the load is likely
-        // genuinely stalled (network/CORS issue) rather than just slow -
-        // let the person testing know, instead of a silent infinite spinner.
-        const stallCheckInterval = setInterval(() => {
-          const secsSinceProgress = Math.round((Date.now() - lastProgressAt) / 1000);
-          const secsTotal = Math.round((Date.now() - loadStartedAt) / 1000);
-          if (secsSinceProgress > 8) {
-            setOverlayText(`Still loading... ${secsTotal}s elapsed, no progress for ${secsSinceProgress}s. Model may be stalled - check your connection.`);
+          const cfg = window.GANTRY_CONFIG;
+          if (!cfg) {
+            console.error('[AR] window.GANTRY_CONFIG is missing - main.js may not have run/finished.');
+            setOverlayText('Error: shared config not found. Try reloading the page.');
+            return;
           }
-        }, 2000);
 
-        gltfLoader.load(
-          cfg.MODEL_URL,
-          (gltf) => {
-            clearInterval(stallCheckInterval);
-            const model = gltf.scene;
+          if (!window.THREE || typeof THREE.GLTFLoader !== 'function') {
+            console.error('[AR] THREE.GLTFLoader is not available - the GLTFLoader script may have failed to load.');
+            setOverlayText('Error: 3D model loader not available. Check your connection and reload.');
+            return;
+          }
 
-            model.traverse((child) => {
-              Object.entries(cfg.AXIS_CONFIG).forEach(([axisKey, axisCfg]) => {
-                if (child.name === axisCfg.nodeName) {
-                  axisStateAR[axisKey] = {
-                    node: child,
-                    axis: axisCfg.axis,
-                    sign: axisCfg.sign,
-                    initial: child.position[axisCfg.axis]
-                  };
-                }
-              });
-            });
+          const { scene } = XR8.Threejs.xrScene();
 
-            arGroup.add(model);
-            setOverlayText('Move your phone to find a surface, then tap it.');
-          },
-          (xhr) => {
-            lastProgressAt = Date.now();
-            if (xhr.lengthComputable) {
-              const pct = Math.round((xhr.loaded / xhr.total) * 100);
-              const mb = (xhr.total / 1024 / 1024).toFixed(1);
-              setOverlayText(`Loading gantry model... ${pct}% (${mb}MB total)`);
-              console.log(`[AR] Model load progress: ${pct}% (${xhr.loaded}/${xhr.total} bytes)`);
-            } else {
-              const mbLoaded = (xhr.loaded / 1024 / 1024).toFixed(1);
-              setOverlayText(`Loading gantry model... ${mbLoaded}MB loaded`);
-              console.log(`[AR] Model load progress: ${xhr.loaded} bytes (total size unknown)`);
+          // Lighting for this scene - independent of the desktop scene's
+          // lights, since this is a separate THREE instance. Matches the
+          // same values as main.js's current defaults; if you retune the
+          // lighting there, update these to match.
+          const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.7);
+          hemi.position.set(20, 20, 20);
+          scene.add(hemi);
+
+          const key = new THREE.DirectionalLight(0xffffff, 2.0);
+          key.position.set(4, 6, 4);
+          scene.add(key);
+
+          const fill = new THREE.DirectionalLight(0xffffff, 2.0);
+          fill.position.set(-4, 3, -3);
+          scene.add(fill);
+
+          scene.add(new THREE.AmbientLight(0xffffff, 1));
+
+          arGroup = new THREE.Group();
+          arGroup.visible = false;
+          scene.add(arGroup);
+
+          setOverlayText('Loading gantry model...');
+          const gltfLoader = new THREE.GLTFLoader();
+          const loadStartedAt = Date.now();
+          let lastProgressAt = Date.now();
+
+          // If no progress event fires for a while, the load is likely
+          // genuinely stalled (network/CORS issue) rather than just slow -
+          // let the person testing know, instead of a silent infinite spinner.
+          const stallCheckInterval = setInterval(() => {
+            const secsSinceProgress = Math.round((Date.now() - lastProgressAt) / 1000);
+            const secsTotal = Math.round((Date.now() - loadStartedAt) / 1000);
+            if (secsSinceProgress > 8) {
+              setOverlayText(`Still loading... ${secsTotal}s elapsed, no progress for ${secsSinceProgress}s. Model may be stalled - check your connection.`);
             }
-          },
-          (error) => {
-            clearInterval(stallCheckInterval);
-            console.error('[AR] Failed to load GLB model:', error);
-            setOverlayText(`Failed to load 3D model: ${error && error.message ? error.message : 'unknown error'}`);
-          }
-        );
+          }, 2000);
 
-        pipelineCanvas.addEventListener('touchstart', (e) => {
-          if (!arGroup) return;
-          const { width, height } = getViewportSize();
-          const x = e.touches[0].clientX / width;
-          const y = e.touches[0].clientY / height;
-          const results = XR8.XrController.hitTest(x, y, ['FEATURE_POINT']);
+          gltfLoader.load(
+            cfg.MODEL_URL,
+            (gltf) => {
+              clearInterval(stallCheckInterval);
+              const model = gltf.scene;
 
-          if (results.length > 0) {
-            const { position, rotation } = results[0];
-            arGroup.position.set(position.x, position.y, position.z);
-            arGroup.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w);
-            arGroup.visible = true;
-            placed = true;
-            hideOverlay();
-          }
-        });
+              model.traverse((child) => {
+                Object.entries(cfg.AXIS_CONFIG).forEach(([axisKey, axisCfg]) => {
+                  if (child.name === axisCfg.nodeName) {
+                    axisStateAR[axisKey] = {
+                      node: child,
+                      axis: axisCfg.axis,
+                      sign: axisCfg.sign,
+                      initial: child.position[axisCfg.axis]
+                    };
+                  }
+                });
+              });
+
+              arGroup.add(model);
+              setOverlayText('Move your phone to find a surface, then tap it.');
+            },
+            (xhr) => {
+              lastProgressAt = Date.now();
+              if (xhr.lengthComputable) {
+                const pct = Math.round((xhr.loaded / xhr.total) * 100);
+                const mb = (xhr.total / 1024 / 1024).toFixed(1);
+                setOverlayText(`Loading gantry model... ${pct}% (${mb}MB total)`);
+                console.log(`[AR] Model load progress: ${pct}% (${xhr.loaded}/${xhr.total} bytes)`);
+              } else {
+                const mbLoaded = (xhr.loaded / 1024 / 1024).toFixed(1);
+                setOverlayText(`Loading gantry model... ${mbLoaded}MB loaded`);
+                console.log(`[AR] Model load progress: ${xhr.loaded} bytes (total size unknown)`);
+              }
+            },
+            (error) => {
+              clearInterval(stallCheckInterval);
+              console.error('[AR] Failed to load GLB model:', error);
+              setOverlayText(`Failed to load 3D model: ${error && error.message ? error.message : 'unknown error'}`);
+            }
+          );
+
+          pipelineCanvas.addEventListener('touchstart', (e) => {
+            if (!arGroup) return;
+            const { width, height } = getViewportSize();
+            const x = e.touches[0].clientX / width;
+            const y = e.touches[0].clientY / height;
+            const results = XR8.XrController.hitTest(x, y, ['FEATURE_POINT']);
+
+            if (results.length > 0) {
+              const { position, rotation } = results[0];
+              arGroup.position.set(position.x, position.y, position.z);
+              arGroup.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w);
+              arGroup.visible = true;
+              placed = true;
+              hideOverlay();
+            }
+          });
+        } catch (err) {
+          console.error('[AR] Unexpected error during AR scene setup:', err);
+          setOverlayText(`Unexpected error: ${err && err.message ? err.message : String(err)}`);
+        }
       },
 
       onUpdate: () => {
