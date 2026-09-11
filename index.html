@@ -233,6 +233,31 @@
   </div>
   <button id="ios-ar-exit-btn" class="ios-ar-exit-button" style="display: none;">Exit AR</button>
 
+  <!-- Temporary debug panel - shows script-loading state on screen, since
+       Safari remote debugging requires a Mac. Safe to remove once the
+       loading issue is resolved. -->
+  <div id="debug-panel" class="debug-panel"></div>
+  <script>
+    (function () {
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+      if (!isIOS) return;
+      const panel = document.getElementById('debug-panel');
+      if (!panel) return;
+      const update = () => {
+        const lines = [
+          `window.THREE: ${!!window.THREE}`,
+          `THREE.Loader: ${!!(window.THREE && window.THREE.Loader)}`,
+          `THREE.GLTFLoader: ${typeof (window.THREE && window.THREE.GLTFLoader)}`,
+          `window.XR8: ${!!window.XR8}`,
+          `window.GANTRY_CONFIG: ${!!window.GANTRY_CONFIG}`
+        ];
+        panel.innerText = lines.join('\n');
+      };
+      update();
+      setInterval(update, 500);
+    })();
+  </script>
+
   <!-- iOS Detection -->
   <script>
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;

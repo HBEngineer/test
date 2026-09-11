@@ -393,5 +393,19 @@ body {
   cursor: pointer;
 }
 
-
-
+/* Temporary debug panel - safe to remove once loading issue is resolved */
+.debug-panel {
+  position: fixed;
+  bottom: 10px;
+  left: 10px;
+  z-index: 3000;
+  background: rgba(0, 0, 0, 0.85);
+  color: #00ff88;
+  font-family: monospace;
+  font-size: 11px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  white-space: pre-line;
+  line-height: 1.5;
+  pointer-events: none;
+}
