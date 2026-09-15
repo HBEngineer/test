@@ -31,7 +31,7 @@
        this app (via the importmap above) - they don't interoperate, which
        is why ar-iphone.js loads its own independent copy of the model. -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="./gltfloader-classic.js"></script>
+  <script src="./gltfloader-classic.js" onerror="window.__gltfScriptFailed = true" onload="window.__gltfScriptLoaded = true"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
 </head>
 <body>
@@ -249,7 +249,9 @@
           `THREE.Loader: ${!!(window.THREE && window.THREE.Loader)}`,
           `THREE.GLTFLoader: ${typeof (window.THREE && window.THREE.GLTFLoader)}`,
           `window.XR8: ${!!window.XR8}`,
-          `window.GANTRY_CONFIG: ${!!window.GANTRY_CONFIG}`
+          `window.GANTRY_CONFIG: ${!!window.GANTRY_CONFIG}`,
+          `script loaded: ${!!window.__gltfScriptLoaded}`,
+          `script failed: ${!!window.__gltfScriptFailed}`
         ];
         panel.innerText = lines.join('\n');
       };
