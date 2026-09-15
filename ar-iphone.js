@@ -70,11 +70,14 @@
     const dpr = window.devicePixelRatio || 1;
     canvas.width = width * dpr;
     canvas.height = height * dpr;
-    canvas.style.setProperty('width', width + 'px', 'important');
-    canvas.style.setProperty('height', height + 'px', 'important');
-    canvas.style.setProperty('position', 'fixed', 'important');
-    canvas.style.setProperty('top', '0', 'important');
-    canvas.style.setProperty('left', '0', 'important');
+    // No !important here (unlike earlier) - that was overriding 8th Wall's
+    // own internal canvas sizing after it takes ownership post-XR8.run(),
+    // fighting its correct resize handling instead of cooperating with it.
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
+    canvas.style.position = 'fixed';
+    canvas.style.top = '0';
+    canvas.style.left = '0';
   };
 
   const startResizeSafetyNet = () => {
@@ -279,8 +282,15 @@
         allowedDevices: XR8.XrConfig.device().ANY
       });
 
-      resizeCanvasToWindow();
-      startResizeSafetyNet();
+      // Nudge 8th Wall's OWN internal resize/camera handling to run once,
+      // the same way a physical rotation naturally does - rather than us
+      // repeatedly forcing canvas dimensions ourselves, which was fighting
+      // their internal camera/renderer sync and causing a mismatched,
+      // "zoomed" state until an actual rotation forced their correct
+      // handling to kick in.
+      setTimeout(() => {
+        window.dispatchEvent(new Event('resize'));
+      }, 800);
     };
 
     if (window.XR8) {
