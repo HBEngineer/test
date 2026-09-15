@@ -91,10 +91,17 @@
   // --- Hide/show the rest of the app's UI while in live AR, so nothing
   // overlaps the full-screen camera feed ---
   const appUiIds = ['status-card', 'light-panel', 'canvas-container', 'ios-ar-btn', 'ios-live-ar-btn'];
+  const savedDisplayValues = {}; // captures each element's actual display value before hiding, so it can be restored exactly (setting style.display = '' falls back to the stylesheet default, which is 'none' for the AR buttons - that was the bug)
   const setAppUiVisible = (visible) => {
     appUiIds.forEach((id) => {
       const el = document.getElementById(id);
-      if (el) el.style.display = visible ? '' : 'none';
+      if (!el) return;
+      if (visible) {
+        el.style.display = savedDisplayValues[id] || '';
+      } else {
+        savedDisplayValues[id] = getComputedStyle(el).display;
+        el.style.display = 'none';
+      }
     });
   };
 
