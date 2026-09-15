@@ -255,6 +255,9 @@
       };
       update();
       setInterval(update, 500);
+      window.addEventListener('error', function (e) {
+        panel.innerText += '\nERROR: ' + e.message + ' (' + e.filename + ':' + e.lineno + ')';
+      });
     })();
   </script>
 
@@ -266,15 +269,6 @@
       document.getElementById('ios-live-ar-btn').style.display = 'flex';
     }
   </script>
-
-  <!-- Main Application Script -->
-  <script type="module" src="./main.js"></script>
-
-  <!-- iPhone Live AR Script (classic, non-module - needs global THREE/XR8) -->
-  <script src="./ar-iphone.js" defer></script>
-
-</body>
-</html>
 
   <!-- Main Application Script -->
   <script type="module" src="./main.js"></script>
