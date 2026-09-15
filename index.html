@@ -31,7 +31,7 @@
        this app (via the importmap above) - they don't interoperate, which
        is why ar-iphone.js loads its own independent copy of the model. -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+  <script src="./gltfloader-classic.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
 </head>
 <body>
@@ -266,6 +266,15 @@
       document.getElementById('ios-live-ar-btn').style.display = 'flex';
     }
   </script>
+
+  <!-- Main Application Script -->
+  <script type="module" src="./main.js"></script>
+
+  <!-- iPhone Live AR Script (classic, non-module - needs global THREE/XR8) -->
+  <script src="./ar-iphone.js" defer></script>
+
+</body>
+</html>
 
   <!-- Main Application Script -->
   <script type="module" src="./main.js"></script>
