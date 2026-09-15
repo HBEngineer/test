@@ -32,6 +32,7 @@
        is why ar-iphone.js loads its own independent copy of the model. -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="./gltfloader-classic.js" onerror="window.__gltfScriptFailed = true" onload="window.__gltfScriptLoaded = true"></script>
+  <script>window.__CAPTURED_THREE__ = window.THREE; window.__CAPTURED_GLTFLOADER__ = window.THREE && window.THREE.GLTFLoader;</script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
 </head>
 <body>
@@ -251,7 +252,9 @@
           `window.XR8: ${!!window.XR8}`,
           `window.GANTRY_CONFIG: ${!!window.GANTRY_CONFIG}`,
           `script loaded: ${!!window.__gltfScriptLoaded}`,
-          `script failed: ${!!window.__gltfScriptFailed}`
+          `script failed: ${!!window.__gltfScriptFailed}`,
+          `CAPTURED_THREE: ${!!window.__CAPTURED_THREE__}`,
+          `CAPTURED_GLTFLOADER: ${typeof window.__CAPTURED_GLTFLOADER__}`
         ];
         panel.innerText = lines.join('\n');
       };

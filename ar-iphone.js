@@ -39,26 +39,12 @@
   // silently get their instance instead of ours, which never had
   // GLTFLoader attached. Capturing early and holding the reference via
   // closure sidesteps that entirely. ---
-  let CapturedTHREE = null;
-  let CapturedGLTFLoader = null;
-
-  const captureThreeReferences = () => {
-    if (window.THREE && typeof window.THREE.GLTFLoader === 'function') {
-      CapturedTHREE = window.THREE;
-      CapturedGLTFLoader = window.THREE.GLTFLoader;
-      return true;
-    }
-    return false;
-  };
-
-  if (!captureThreeReferences()) {
-    // Not ready yet at the moment this script ran - poll briefly in case
-    // our scripts are still finishing up.
-    const captureInterval = setInterval(() => {
-      if (captureThreeReferences()) clearInterval(captureInterval);
-    }, 50);
-    setTimeout(() => clearInterval(captureInterval), 5000);
-  }
+  // Captured in index.html via an inline script placed immediately after
+  // our classic THREE/GLTFLoader tags and BEFORE the async 8th Wall engine
+  // tag - guaranteed to run before any overwrite of window.THREE is
+  // possible. Reading window.THREE fresh here would be too late.
+  const CapturedTHREE = window.__CAPTURED_THREE__;
+  const CapturedGLTFLoader = window.__CAPTURED_GLTFLOADER__;
 
   const setOverlayText = (text) => {
     if (overlayText) overlayText.innerText = text;
