@@ -3,7 +3,6 @@
 // ==========================================
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { ARButton } from 'three/addons/webxr/ARButton.js';
 
@@ -42,15 +41,8 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.2;
+renderer.toneMappingExposure = 0.9;
 
-// Neutral studio environment map for realistic PBR reflections - this is
-// what most "nice looking" online viewers actually rely on most heavily,
-// not just direct lights. Direct light intensities below are reduced
-// accordingly since the environment now provides substantial ambient
-// lighting/reflections on its own.
-const pmremGenerator = new THREE.PMREMGenerator(renderer);
-scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
 
 // Enable WebXR
 renderer.xr.enabled = true;
@@ -85,11 +77,11 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
 // --- LIGHTING SETUP ---
-const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.3);
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0);
 hemiLight.position.set(20, 20, 20);
 scene.add(hemiLight);
 
-const keyLight = new THREE.DirectionalLight(0xffffff, 2.2);
+const keyLight = new THREE.DirectionalLight(0xffffff, 2);
 keyLight.position.set(4, 6, 4);
 keyLight.castShadow = true;
 // Without bias tuning, shadow maps commonly produce "shadow acne" - fine
@@ -100,11 +92,11 @@ keyLight.shadow.normalBias = 0.02;
 keyLight.shadow.mapSize.set(2048, 2048);
 scene.add(keyLight);
 
-const fillLight = new THREE.DirectionalLight(0xffffff, 0.6);
+const fillLight = new THREE.DirectionalLight(0xffffff, 0);
 fillLight.position.set(-4, 3, -3);
 scene.add(fillLight);
 
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.15);
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.35);
 scene.add(ambientLight);
 
 // Camera light (headlight) - follows the viewer so the side of the model
@@ -113,7 +105,7 @@ scene.add(ambientLight);
 // "on-camera flash" hotspot, where a light sitting at the same position as
 // the camera reflects straight back into the lens off glossy surfaces
 // (this was washing out the blue actuator housings).
-const cameraLight = new THREE.DirectionalLight(0xffffff, 0.4);
+const cameraLight = new THREE.DirectionalLight(0xffffff, 1.52);
 camera.add(cameraLight);
 cameraLight.target.position.set(0, 0, -1); // points forward, in the camera's local space
 camera.add(cameraLight.target);
