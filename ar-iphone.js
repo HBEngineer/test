@@ -204,7 +204,7 @@
               if (xhr.lengthComputable) {
                 const pct = Math.round((xhr.loaded / xhr.total) * 100);
                 const mb = (xhr.total / 1024 / 1024).toFixed(1);
-                setOverlayText(`Loading gantry model... ${pct}% (${mb}MB total)`);
+            //    setOverlayText(`Loading gantry model... ${pct}% (${mb}MB total)`);
                 console.log(`[AR] Model load progress: ${pct}% (${xhr.loaded}/${xhr.total} bytes)`);
               } else {
                 const mbLoaded = (xhr.loaded / 1024 / 1024).toFixed(1);
