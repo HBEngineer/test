@@ -67,12 +67,13 @@
   const resizeCanvasToWindow = () => {
     if (!canvas) return;
     const { width, height } = getViewportSize();
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = width * dpr;
-    canvas.height = height * dpr;
-    // No !important here (unlike earlier) - that was overriding 8th Wall's
-    // own internal canvas sizing after it takes ownership post-XR8.run(),
-    // fighting its correct resize handling instead of cooperating with it.
+    // No devicePixelRatio multiplication - confirmed via isolated testing
+    // that this was the actual cause of the "zoomed" camera view. 8th Wall
+    // expects canvas.width/height to match CSS pixels 1:1, not a DPR-scaled
+    // backing store. No !important either - that fights 8th Wall's own
+    // internal canvas sizing after it takes ownership post-XR8.run().
+    canvas.width = width;
+    canvas.height = height;
     canvas.style.width = width + 'px';
     canvas.style.height = height + 'px';
     canvas.style.position = 'fixed';
