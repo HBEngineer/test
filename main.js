@@ -41,7 +41,7 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 0.9;
+renderer.toneMappingExposure = 0.5;
 
 
 // Enable WebXR
@@ -81,7 +81,7 @@ const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0);
 hemiLight.position.set(20, 20, 20);
 scene.add(hemiLight);
 
-const keyLight = new THREE.DirectionalLight(0xffffff, 2);
+const keyLight = new THREE.DirectionalLight(0xffffff, 4);
 keyLight.position.set(4, 6, 4);
 keyLight.castShadow = true;
 // Without bias tuning, shadow maps commonly produce "shadow acne" - fine
