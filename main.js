@@ -105,7 +105,7 @@ scene.add(ambientLight);
 // "on-camera flash" hotspot, where a light sitting at the same position as
 // the camera reflects straight back into the lens off glossy surfaces
 // (this was washing out the blue actuator housings).
-const cameraLight = new THREE.DirectionalLight(0xffffff, 1.52);
+const cameraLight = new THREE.DirectionalLight(0xffffff, 3);  // 1.52);
 camera.add(cameraLight);
 cameraLight.target.position.set(0, 0, -1); // points forward, in the camera's local space
 camera.add(cameraLight.target);
