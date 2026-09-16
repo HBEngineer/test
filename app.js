@@ -10,20 +10,11 @@ const getViewportSize = () => {
   return { width: window.innerWidth, height: window.innerHeight };
 };
 
-const resizeCanvasToWindow = () => {
-  const canvas = document.getElementById('camerafeed');
-  if (!canvas) return;
-  const { width, height } = getViewportSize();
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width = width * dpr;
-  canvas.height = height * dpr;
-  // No !important - let 8th Wall's own internal resize handling own the
-  // canvas after XR8.run() starts, rather than fighting it.
-  canvas.style.width = width + 'px';
-  canvas.style.height = height + 'px';
-};
-window.addEventListener('resize', resizeCanvasToWindow);
-if (window.visualViewport) window.visualViewport.addEventListener('resize', resizeCanvasToWindow);
+// NO manual canvas.width/height/DPR sizing at all in this version - 8th
+// Wall's own engine manages the canvas resolution internally. Our earlier
+// manual sizing (setting canvas.width = width * devicePixelRatio before
+// XR8.run()) may have been the actual cause of the "zoomed from the start"
+// behavior, not a fix for anything.
 
 const testCubePipelineModule = () => {
   let cube;
@@ -64,8 +55,6 @@ const testCubePipelineModule = () => {
 };
 
 const onxrloaded = () => {
-  resizeCanvasToWindow();
-
   XR8.addCameraPipelineModules([
     XR8.GlTextureRenderer.pipelineModule(),
     XR8.Threejs.pipelineModule(),
@@ -77,12 +66,6 @@ const onxrloaded = () => {
     canvas: document.getElementById('camerafeed'),
     allowedDevices: XR8.XrConfig.device().ANY,
   });
-
-  // Nudge 8th Wall's own internal resize/camera handling to run once,
-  // rather than us repeatedly forcing canvas dimensions ourselves.
-  setTimeout(() => {
-    window.dispatchEvent(new Event('resize'));
-  }, 800);
 };
 
 window.XR8 ? onxrloaded() : window.addEventListener('xrloaded', onxrloaded);
