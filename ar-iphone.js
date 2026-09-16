@@ -199,7 +199,7 @@
               nudge8thWallResize(); // model just became visible-capable - sync 8th Wall's internal camera now, not on a fixed timer unrelated to load time
               setOverlayText('Move your phone to find a surface, then tap it.');
             },
-           /* (xhr) => {
+            (xhr) => {
               lastProgressAt = Date.now();
               if (xhr.lengthComputable) {
                 const pct = Math.round((xhr.loaded / xhr.total) * 100);
@@ -208,8 +208,8 @@
                 console.log(`[AR] Model load progress: ${pct}% (${xhr.loaded}/${xhr.total} bytes)`);
               } else {
                 const mbLoaded = (xhr.loaded / 1024 / 1024).toFixed(1);
-                setOverlayText(`Loading gantry model... ${mbLoaded}MB loaded`);
-                console.log(`[AR] Model load progress: ${xhr.loaded} bytes (total size unknown)`);
+            //    setOverlayText(`Loading gantry model... ${mbLoaded}MB loaded`);
+            //    console.log(`[AR] Model load progress: ${xhr.loaded} bytes (total size unknown)`);
               }
             },
             (error) => {
@@ -217,7 +217,7 @@
               console.error('[AR] Failed to load GLB model:', error);
               setOverlayText(`Failed to load 3D model: ${error && error.message ? error.message : 'unknown error'}`);
             }
-          );*/
+          );
 
           pipelineCanvas.addEventListener('touchstart', (e) => {
             if (!arGroup) return;
