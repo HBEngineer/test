@@ -196,6 +196,7 @@
               });
 
               arGroup.add(model);
+              nudge8thWallResize(); // model just became visible-capable - sync 8th Wall's internal camera now, not on a fixed timer unrelated to load time
               setOverlayText('Move your phone to find a surface, then tap it.');
             },
             (xhr) => {
@@ -230,6 +231,7 @@
               arGroup.position.set(position.x, position.y, position.z);
               arGroup.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w);
               arGroup.visible = true;
+              nudge8thWallResize(); // sync again right at the moment of first placement
               placed = true;
               hideOverlay();
             }
@@ -262,7 +264,12 @@
     setOverlayText('Starting AR...');
     showOverlay();
 
-    window.addEventListener('resize', resizeCanvasToWindow);
+    const nudge8thWallResize = () => {
+    window.dispatchEvent(new Event('resize'));
+    window.dispatchEvent(new Event('orientationchange'));
+  };
+
+  window.addEventListener('resize', resizeCanvasToWindow);
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', resizeCanvasToWindow);
     }
@@ -283,15 +290,6 @@
         allowedDevices: XR8.XrConfig.device().ANY
       });
 
-      // Nudge 8th Wall's OWN internal resize/camera handling to run once,
-      // the same way a physical rotation naturally does - rather than us
-      // repeatedly forcing canvas dimensions ourselves, which was fighting
-      // their internal camera/renderer sync and causing a mismatched,
-      // "zoomed" state until an actual rotation forced their correct
-      // handling to kick in.
-      setTimeout(() => {
-        window.dispatchEvent(new Event('resize'));
-      }, 800);
     };
 
     if (window.XR8) {
