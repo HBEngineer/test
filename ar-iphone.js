@@ -160,7 +160,7 @@
           arGroup.visible = false;
           scene.add(arGroup);
 
-         // setOverlayText('Loading gantry model...');
+          setOverlayText('Loading gantry model...');
           const gltfLoader = new CapturedGLTFLoader();
           const loadStartedAt = Date.now();
           let lastProgressAt = Date.now();
@@ -204,12 +204,12 @@
               if (xhr.lengthComputable) {
                 const pct = Math.round((xhr.loaded / xhr.total) * 100);
                 const mb = (xhr.total / 1024 / 1024).toFixed(1);
-            //    setOverlayText(`Loading gantry model... ${pct}% (${mb}MB total)`);
+                setOverlayText(`Loading gantry model... ${pct}% (${mb}MB total)`);
                 console.log(`[AR] Model load progress: ${pct}% (${xhr.loaded}/${xhr.total} bytes)`);
               } else {
                 const mbLoaded = (xhr.loaded / 1024 / 1024).toFixed(1);
-            //    setOverlayText(`Loading gantry model... ${mbLoaded}MB loaded`);
-            //    console.log(`[AR] Model load progress: ${xhr.loaded} bytes (total size unknown)`);
+                setOverlayText(`Loading gantry model... ${mbLoaded}MB loaded`);
+                console.log(`[AR] Model load progress: ${xhr.loaded} bytes (total size unknown)`);
               }
             },
             (error) => {
