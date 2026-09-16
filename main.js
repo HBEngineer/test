@@ -83,7 +83,7 @@ scene.add(hemiLight);
 
 const keyLight = new THREE.DirectionalLight(0xffffff, 4);
 keyLight.position.set(4, 6, 4);
-keyLight.castShadow = true;
+keyLight.castShadow = false //true;
 // Without bias tuning, shadow maps commonly produce "shadow acne" - fine
 // self-shadowing streaks - on surfaces with tight ridges/grooves, like the
 // extrusion's rail profile. These two settings fix that.
