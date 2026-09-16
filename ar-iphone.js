@@ -160,7 +160,7 @@
           arGroup.visible = false;
           scene.add(arGroup);
 
-          setOverlayText('Loading gantry model...');
+         // setOverlayText('Loading gantry model...');
           const gltfLoader = new CapturedGLTFLoader();
           const loadStartedAt = Date.now();
           let lastProgressAt = Date.now();
