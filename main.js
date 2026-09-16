@@ -409,13 +409,14 @@ document.getElementById('btn-load-factory').addEventListener('click', () => {
 // local axis corresponds to a given real-world direction. If testing shows
 // a slide moving the wrong way (or not at all), just change the `axis`
 // value below for that entry - nothing else needs to change.
+
 const AXIS_CONFIG = {
-  PosX: { nodeName: 'Slide_X', axis: 'x', valueElementId: 'val-x', sign: 1 },
+  PosX: { nodeName: 'Slide_X', axis: 'z', valueElementId: 'val-x', sign: 1 },
   // Slide_X has a 90-degree rotation baked in, inherited by everything
   // nested under it (Slide_Y, Slide_Z). That rotation swaps which local
   // axis points along world X vs world Z (world Y/vertical is unaffected).
   // Slide_Y's local X is the one that actually points along world Z here.
-  PosY: { nodeName: 'Slide_Y', axis: 'x', valueElementId: 'val-y', sign: -1 },
+  PosY: { nodeName: 'Slide_Y', axis: 'z', valueElementId: 'val-y', sign: 1 },
   PosZ: { nodeName: 'Slide_Z', axis: 'y', valueElementId: 'val-z', sign: -1 } // confirmed correct - vertical (world Y) is unaffected by the rotation
 };
 
