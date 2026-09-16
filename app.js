@@ -10,11 +10,23 @@ const getViewportSize = () => {
   return { width: window.innerWidth, height: window.innerHeight };
 };
 
-// NO manual canvas.width/height/DPR sizing at all in this version - 8th
-// Wall's own engine manages the canvas resolution internally. Our earlier
-// manual sizing (setting canvas.width = width * devicePixelRatio before
-// XR8.run()) may have been the actual cause of the "zoomed from the start"
-// behavior, not a fix for anything.
+// Size the canvas 1:1 with CSS pixels - NO devicePixelRatio multiplication.
+// Multiplying by DPR (our earlier approach) created a backing store larger
+// than the CSS display size, which likely caused 8th Wall's internal
+// camera-texture-to-viewport scaling to effectively "zoom in", since it may
+// expect canvas.width/height to match window.innerWidth/innerHeight (CSS
+// pixels) directly, not a DPR-scaled resolution.
+const resizeCanvasToWindow = () => {
+  const canvas = document.getElementById('camerafeed');
+  if (!canvas) return;
+  const { width, height } = getViewportSize();
+  canvas.width = width;
+  canvas.height = height;
+  canvas.style.width = width + 'px';
+  canvas.style.height = height + 'px';
+};
+window.addEventListener('resize', resizeCanvasToWindow);
+if (window.visualViewport) window.visualViewport.addEventListener('resize', resizeCanvasToWindow);
 
 const testCubePipelineModule = () => {
   let cube;
@@ -55,6 +67,8 @@ const testCubePipelineModule = () => {
 };
 
 const onxrloaded = () => {
+  resizeCanvasToWindow();
+
   XR8.addCameraPipelineModules([
     XR8.GlTextureRenderer.pipelineModule(),
     XR8.Threejs.pipelineModule(),
