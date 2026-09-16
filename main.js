@@ -3,6 +3,7 @@
 // ==========================================
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { ARButton } from 'three/addons/webxr/ARButton.js';
 
@@ -43,6 +44,14 @@ renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.2;
 
+// Neutral studio environment map for realistic PBR reflections - this is
+// what most "nice looking" online viewers actually rely on most heavily,
+// not just direct lights. Direct light intensities below are reduced
+// accordingly since the environment now provides substantial ambient
+// lighting/reflections on its own.
+const pmremGenerator = new THREE.PMREMGenerator(renderer);
+scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+
 // Enable WebXR
 renderer.xr.enabled = true;
 
@@ -76,11 +85,11 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
 // --- LIGHTING SETUP ---
-const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.7);
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.3);
 hemiLight.position.set(20, 20, 20);
 scene.add(hemiLight);
 
-const keyLight = new THREE.DirectionalLight(0xffffff, 2.0);
+const keyLight = new THREE.DirectionalLight(0xffffff, 2.2);
 keyLight.position.set(4, 6, 4);
 keyLight.castShadow = true;
 // Without bias tuning, shadow maps commonly produce "shadow acne" - fine
@@ -91,11 +100,11 @@ keyLight.shadow.normalBias = 0.02;
 keyLight.shadow.mapSize.set(2048, 2048);
 scene.add(keyLight);
 
-const fillLight = new THREE.DirectionalLight(0xffffff, 2.0);
+const fillLight = new THREE.DirectionalLight(0xffffff, 0.6);
 fillLight.position.set(-4, 3, -3);
 scene.add(fillLight);
 
-const ambientLight = new THREE.AmbientLight(0xffffff, 1);
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.15);
 scene.add(ambientLight);
 
 // Camera light (headlight) - follows the viewer so the side of the model
@@ -104,7 +113,7 @@ scene.add(ambientLight);
 // "on-camera flash" hotspot, where a light sitting at the same position as
 // the camera reflects straight back into the lens off glossy surfaces
 // (this was washing out the blue actuator housings).
-const cameraLight = new THREE.DirectionalLight(0xffffff, 0.8);
+const cameraLight = new THREE.DirectionalLight(0xffffff, 0.4);
 camera.add(cameraLight);
 cameraLight.target.position.set(0, 0, -1); // points forward, in the camera's local space
 camera.add(cameraLight.target);
@@ -117,6 +126,18 @@ scene.add(arGroup);
 // --- GRID HELPER ---
 const gridHelper = new THREE.GridHelper(10, 20, 0xFFFFFF, 0x444444);
 gridHelper.position.y = -0.01;
+
+// Invisible shadow-catching floor - the grid itself is unlit wireframe
+// lines and can't receive shadows, so without this the model casts no
+// visible shadow at all, which was a big part of why it looked flat
+// compared to the reference image (which clearly shows ground shadows).
+const shadowCatcher = new THREE.Mesh(
+  new THREE.PlaneGeometry(40, 40),
+  new THREE.ShadowMaterial({ opacity: 0.35 })
+);
+shadowCatcher.rotation.x = -Math.PI / 2;
+shadowCatcher.receiveShadow = true;
+arGroup.add(shadowCatcher);
 arGroup.add(gridHelper);
 
 // WebXR Session handlers
@@ -192,10 +213,10 @@ const LIGHTING_STORAGE_KEY = 'gantryDigitalTwin.lightingDefaults';
 // The values the scene was originally authored with. "Reset to Factory"
 // always returns to this configuration, regardless of what's been saved.
 const FACTORY_LIGHTING_CONFIG = {
-  hemi: { intensity: 0.7, position: { x: 20, y: 20, z: 20 } },
-  key: { intensity: 2.0, color: '#ffffff', position: { x: 4, y: 6, z: 4 } },
-  fill: { intensity: 2.0, color: '#ffffff', position: { x: -4, y: 3, z: -3 } },
-  ambient: { intensity: 1, color: '#ffffff' },
+  hemi: { intensity: 0.6, position: { x: 20, y: 20, z: 20 } },
+  key: { intensity: 3.5, color: '#ffffff', position: { x: 4, y: 6, z: 4 } },
+  fill: { intensity: 1.5, color: '#ffffff', position: { x: -4, y: 3, z: -3 } },
+  ambient: { intensity: 0.4, color: '#ffffff' },
   background: '#c7ccd1'
 };
 
@@ -481,6 +502,7 @@ loader.load(
 
     const box = new THREE.Box3().setFromObject(model);
     gridHelper.position.y = box.min.y - 0.001;
+    shadowCatcher.position.y = box.min.y - 0.001;
 
     const center = box.getCenter(new THREE.Vector3());
     controls.target.copy(center);
