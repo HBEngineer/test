@@ -1,25 +1,26 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <title>Gantry Digital Twin</title>
-  
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Festo Gantry Digital Twin - 8th Wall WebAR</title>
+
+  <!-- MQTT Library -->
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+
+  <!-- 8th Wall WebAR Engine -->
+  <!-- Replace YOUR_APP_KEY with your key from the 8th Wall console -->
+  <script async src="//apps.8thwall.com/8eth/xrweb?appKey=YOUR_APP_KEY"></script>
+
   <style>
-    * {
-      box-sizing: border-box;
+    body, html {
       margin: 0;
       padding: 0;
-      user-select: none;
-    }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      background-color: #2b2b2b;
-      color: #ffffff;
+      width: 100%;
+      height: 100%;
       overflow: hidden;
-      width: 100vw;
-      height: 100vh;
+      font-family: Arial, sans-serif;
+      background-color: #000000;
     }
 
     #canvas-container {
@@ -28,151 +29,60 @@
       position: absolute;
       top: 0;
       left: 0;
-      z-index: 1;
     }
 
-    /* Overlay Panels */
-    .panel {
+    #status-overlay {
       position: absolute;
-      z-index: 10;
-      background: rgba(30, 30, 30, 0.85);
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 12px;
-      padding: 16px;
-      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-    }
-
-    #status-panel {
-      top: 20px;
-      left: 20px;
-      min-width: 220px;
-    }
-
-    .status-header {
+      top: 16px;
+      left: 16px;
+      background: rgba(0, 0, 0, 0.75);
+      color: #ffffff;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 14px;
       display: flex;
       align-items: center;
       gap: 10px;
-      margin-bottom: 12px;
-      font-weight: 600;
-      font-size: 14px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: #aaa;
+      z-index: 10;
+      backdrop-filter: blur(4px);
     }
 
-    .dot {
+    #dot {
       width: 10px;
       height: 10px;
       border-radius: 50%;
-      background-color: #ff5252;
-      box-shadow: 0 0 10px #ff5252;
-      transition: background-color 0.3s, box-shadow 0.3s;
+      background-color: #ff9800;
+      box-shadow: 0 0 8px #ff9800;
     }
 
-    .telemetry-row {
-      display: flex;
-      justify-content: space-between;
-      margin-top: 8px;
-      font-size: 14px;
-      font-family: monospace;
-    }
-
-    .telemetry-label {
-      color: #888;
-    }
-
-    .telemetry-val {
-      color: #4caf50;
-      font-weight: bold;
-    }
-
-    /* Lighting Control Panel */
-    #light-panel {
-      top: 20px;
-      right: 20px;
-      width: 260px;
-      transition: all 0.3s ease;
-    }
-
-    .panel-header {
-      font-weight: 600;
-      font-size: 14px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: #aaa;
-      cursor: pointer;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    /* CSS Pure Triangle Arrow (Fixes ? encoding issues) */
-    .arrow-icon {
-      width: 0;
-      height: 0;
-      border-left: 5px solid transparent;
-      border-right: 5px solid transparent;
-      border-bottom: 7px solid #aaa;
-      transition: transform 0.3s ease;
-    }
-
-    #light-panel.collapsed .arrow-icon {
-      transform: rotate(180deg);
-    }
-
-    #light-panel.collapsed .panel-body {
-      display: none;
-    }
-
-    .panel-body {
-      margin-top: 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-    }
-
-    .control-group {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .control-group label {
-      font-size: 13px;
-      color: #ccc;
-      display: flex;
-      justify-content: space-between;
-    }
-
-    .control-group input[type="range"] {
-      width: 100%;
-      accent-color: #2196f3;
-      cursor: pointer;
-    }
-
-    #ar-scan-overlay {
+    #ar-instruction {
       position: absolute;
-      top: 50%;
+      bottom: 24px;
       left: 50%;
-      transform: translate(-50%, -50%);
-      z-index: 20;
-      background: rgba(0, 0, 0, 0.75);
-      padding: 16px 24px;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.7);
+      color: #ffffff;
+      padding: 10px 20px;
       border-radius: 20px;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      color: #fff;
-      font-size: 15px;
+      font-size: 14px;
+      z-index: 10;
       pointer-events: none;
-      display: none;
       text-align: center;
     }
-
-    #ar-scan-overlay.visible {
-      display: block;
-    }
   </style>
+</head>
+<body>
 
+  <div id="status-overlay">
+    <div id="dot"></div>
+    <span id="status">Connecting MQTT...</span>
+  </div>
+
+  <div id="ar-instruction">Tap screen to place Gantry</div>
+
+  <div id="canvas-container"></div>
+
+  <!-- Import Map for Three.js ES Modules -->
   <script type="importmap">
     {
       "imports": {
@@ -181,53 +91,6 @@
       }
     }
   </script>
-
-  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-</head>
-<body>
-
-  <div id="canvas-container"></div>
-
-  <div id="status-panel" class="panel">
-    <div class="status-header">
-      <div id="dot" class="dot"></div>
-      <span id="status">Connecting...</span>
-    </div>
-    <div class="telemetry-row">
-      <span class="telemetry-label">X Axis:</span>
-      <span id="val-x" class="telemetry-val">0 mm</span>
-    </div>
-    <div class="telemetry-row">
-      <span class="telemetry-label">Y Axis:</span>
-      <span id="val-y" class="telemetry-val">0 mm</span>
-    </div>
-    <div class="telemetry-row">
-      <span class="telemetry-label">Z Axis:</span>
-      <span id="val-z" class="telemetry-val">0 mm</span>
-    </div>
-  </div>
-
-  <!-- Lighting Panel (Closed by default) -->
-  <div id="light-panel" class="panel collapsed">
-    <div id="light-panel-header" class="panel-header">
-      <span>Lighting</span>
-      <span class="arrow-icon"></span>
-    </div>
-    <div class="panel-body">
-      <div class="control-group">
-        <label for="ctrl-brightness">Master Brightness <span id="lbl-brightness">100%</span></label>
-        <input type="range" id="ctrl-brightness" min="0.2" max="2.0" step="0.1" value="1.0">
-      </div>
-      <div class="control-group">
-        <label for="ctrl-angle">Light Angle <span id="lbl-angle">45°</span></label>
-        <input type="range" id="ctrl-angle" min="0" max="360" step="5" value="45">
-      </div>
-    </div>
-  </div>
-
-  <div id="ar-scan-overlay">
-    <span id="ar-scan-text">Scan surface...</span>
-  </div>
 
   <script type="module" src="./main.js"></script>
 </body>
