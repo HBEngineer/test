@@ -25,7 +25,6 @@ const scene = new THREE.Scene();
 window.scene = scene;
 window.THREE = THREE;
 
-// Dark studio background matching reference image
 scene.background = new THREE.Color(0x2b2b2b);
 
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -39,17 +38,17 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.35; // Increased exposure for shiny highlights
+renderer.toneMappingExposure = 1.6; // Higher exposure so silver metal shines bright
 
 renderer.xr.enabled = true;
 container.appendChild(renderer.domElement);
 
-// --- ENVIRONMENT MAP (Metallic Reflections) ---
+// --- ENVIRONMENT MAP (Bright metallic reflections) ---
 const rgbeLoader = new RGBELoader();
 rgbeLoader.load('https://threejs.org/examples/textures/equirectangular/royal_esplanade_1k.hdr', (texture) => {
   texture.mapping = THREE.EquirectangularReflectionMapping;
   scene.environment = texture;
-  scene.environmentIntensity = 2.5; // High reflection intensity
+  scene.environmentIntensity = 3.5; // Boosted reflections to bring back silver finish
 });
 
 if (navigator.xr) {
@@ -69,8 +68,8 @@ if (navigator.xr) {
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
-// --- REBALANCED LIGHTING SETUP ---
-const keyLight = new THREE.DirectionalLight(0xffffff, 3.5);
+// --- BRIGHT BALANCED LIGHTING ---
+const keyLight = new THREE.DirectionalLight(0xffffff, 4.0);
 keyLight.position.set(4, 6, 4);
 keyLight.castShadow = true;
 keyLight.shadow.bias = -0.0015;
@@ -84,22 +83,22 @@ keyLight.shadow.camera.top = 3;
 keyLight.shadow.camera.bottom = -3;
 scene.add(keyLight);
 
-const fillLight = new THREE.DirectionalLight(0xe0f0ff, 2.0);
+const fillLight = new THREE.DirectionalLight(0xffffff, 2.5);
 fillLight.position.set(-4, 3, -3);
 scene.add(fillLight);
 
-const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+const ambientLight = new THREE.AmbientLight(0xffffff, 1.8);
 scene.add(ambientLight);
 
-const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0);
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0x666666, 1.5);
 hemiLight.position.set(0, 20, 0);
 scene.add(hemiLight);
 
 const BASE_INTENSITIES = {
-  key: 3.5,
-  fill: 2.0,
-  ambient: 1.2,
-  hemi: 1.0
+  key: 4.0,
+  fill: 2.5,
+  ambient: 1.8,
+  hemi: 1.5
 };
 
 // --- AR GROUP & FLOOR MAT ---
@@ -254,10 +253,10 @@ loader.load(
         child.receiveShadow = true;
 
         if (child.material) {
-          // Tune materials for polished metal look
-          child.material.metalness = 0.9;         // Higher metallic response
-          child.material.roughness = 0.15;        // Lower roughness for clear specular reflections
-          child.material.envMapIntensity = 2.5;   // Strong reflection intensity
+          // Rebalanced parameters for realistic silver metallic extrusions
+          child.material.metalness = 0.6;
+          child.material.roughness = 0.25;
+          child.material.envMapIntensity = 3.0;
         }
       }
       Object.entries(AXIS_CONFIG).forEach(([key, cfg]) => {
