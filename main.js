@@ -1,42 +1,21 @@
-// ==========================================
-// 0. MODULE IMPORTS
-// ==========================================
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+import { ARButton } from 'three/addons/webxr/ARButton.js';
 
-window.THREE = THREE;
-
-// ==========================================
-// 1. HIVEMQ CLOUD CREDENTIALS
-// ==========================================
 const HIVEMQ_HOST = "0bd403ef4ed0449a81d8e2de7a705113.s1.eu.hivemq.cloud";
 const HIVEMQ_PORT = 8884;
 const HIVEMQ_USERNAME = "FestoPLC1";
 const HIVEMQ_PASSWORD = "FestoPLC1";
 const MQTT_TOPIC = "festo/hgosydney/positions";
 
-// ==========================================
-// 2. CONFIG & GANTRY STATE
-// ==========================================
-const AXIS_CONFIG = {
-  PosX: { nodeName: 'Slide_X', axis: 'z', valueElementId: 'val-x', sign: 1 },
-  PosY: { nodeName: 'Slide_Y', axis: 'x', valueElementId: 'val-y', sign: -1 },
-  PosZ: { nodeName: 'Slide_Z', axis: 'y', valueElementId: 'val-z', sign: -1 }
-};
-
-const axisState = {};
-const SCALE_FACTOR = 0.001;
-const LERP_FACTOR = 0.05;
-const MODEL_URL = './model/hgosydney_Kinetic.glb';
-
-// ==========================================
-// 3. THREE.JS SCENE SETUP (v1.0 Baseline)
-// ==========================================
 const container = document.getElementById('canvas-container');
 
 const scene = new THREE.Scene();
+window.scene = scene;
+window.THREE = THREE;
+
 scene.background = new THREE.Color(0x2b2b2b);
 
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -52,12 +31,11 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.65;
+
+renderer.xr.enabled = true;
 container.appendChild(renderer.domElement);
 
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-
-// Environment Map
+// Environment Map Reflections
 const rgbeLoader = new RGBELoader();
 rgbeLoader.load('https://threejs.org/examples/textures/equirectangular/royal_esplanade_1k.hdr', (texture) => {
   texture.mapping = THREE.EquirectangularReflectionMapping;
@@ -65,11 +43,23 @@ rgbeLoader.load('https://threejs.org/examples/textures/equirectangular/royal_esp
   scene.environmentIntensity = 3.5;
 });
 
-// Camera Light & Scene Lighting
+if (navigator.xr) {
+  navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
+    if (supported) {
+      document.body.appendChild(ARButton.createButton(renderer));
+    }
+  }).catch(() => {});
+}
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+// Camera Light
 const cameraLight = new THREE.DirectionalLight(0xffffff, 2.2);
 cameraLight.position.set(0, 0, 1);
 camera.add(cameraLight);
 
+// Key/Fill/Ambient
 const keyLight = new THREE.DirectionalLight(0xffffff, 4.0);
 keyLight.position.set(4, 6, 4);
 keyLight.castShadow = true;
@@ -88,11 +78,31 @@ scene.add(hemiLight);
 
 const BASE_INTENSITIES = { key: 4.0, fill: 3.0, ambient: 1.8, hemi: 1.6, camera: 2.2 };
 
-// Model Container Group
 const arGroup = new THREE.Group();
 scene.add(arGroup);
 
-// Load GLB Model
+const floorGeo = new THREE.PlaneGeometry(10, 10);
+const floorMat = new THREE.MeshStandardMaterial({ color: 0xdcdcdc, roughness: 0.8, metalness: 0.1 });
+const floorMesh = new THREE.Mesh(floorGeo, floorMat);
+floorMesh.rotation.x = -Math.PI / 2;
+floorMesh.receiveShadow = true;
+arGroup.add(floorMesh);
+
+const gridHelper = new THREE.GridHelper(10, 10, 0xbbbbbb, 0xcccccc);
+gridHelper.position.y = 0.001;
+arGroup.add(gridHelper);
+
+const AXIS_CONFIG = {
+  PosX: { nodeName: 'Slide_X', axis: 'z', sign: 1 },
+  PosY: { nodeName: 'Slide_Y', axis: 'x', sign: -1 },
+  PosZ: { nodeName: 'Slide_Z', axis: 'y', sign: -1 }
+};
+
+const axisState = {};
+const SCALE_FACTOR = 0.001;
+const LERP_FACTOR = 0.05;
+const MODEL_URL = './model/hgosydney_Kinetic.glb';
+
 const loader = new GLTFLoader();
 loader.load(MODEL_URL, (gltf) => {
   const model = gltf.scene;
@@ -118,12 +128,15 @@ loader.load(MODEL_URL, (gltf) => {
       }
     });
   });
+
   arGroup.add(model);
+  const box = new THREE.Box3().setFromObject(model);
+  const center = box.getCenter(new THREE.Vector3());
+  controls.target.copy(center);
+  controls.update();
 });
 
-// ==========================================
-// 4. RESTORED LIGHTING CONTROLS UI
-// ==========================================
+// UI Control Handlers
 const lightPanel = document.getElementById('light-panel');
 const panelHeader = document.getElementById('light-panel-header');
 if (panelHeader && lightPanel) {
@@ -146,20 +159,16 @@ if (ctrlBrightness) {
 
 const ctrlAngle = document.getElementById('ctrl-angle');
 const lblAngle = document.getElementById('lbl-angle');
-const LIGHT_RADIUS = 7.2;
 if (ctrlAngle) {
   ctrlAngle.addEventListener('input', (e) => {
     const deg = parseFloat(e.target.value);
     const rad = (deg * Math.PI) / 180;
-    keyLight.position.x = Math.cos(rad) * LIGHT_RADIUS;
-    keyLight.position.z = Math.sin(rad) * LIGHT_RADIUS;
+    keyLight.position.x = Math.cos(rad) * 7.2;
+    keyLight.position.z = Math.sin(rad) * 7.2;
     if (lblAngle) lblAngle.innerText = `${Math.round(deg)}°`;
   });
 }
 
-// ==========================================
-// 5. ANIMATION LOOP & 8TH WALL FALLBACK
-// ==========================================
 function animate() {
   Object.values(axisState).forEach(({ node, axis, sign, initial, target }) => {
     const targetValue = initial + (target * SCALE_FACTOR * sign);
@@ -170,7 +179,6 @@ function animate() {
   renderer.render(scene, camera);
 }
 
-// Standard WebGL Render Loop (ensures model shows even if 8th Wall camera fails)
 renderer.setAnimationLoop(animate);
 
 window.addEventListener('resize', () => {
@@ -179,12 +187,9 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// ==========================================
-// 6. HIVEMQ CLOUD CONNECTION
-// ==========================================
-const brokerUrl = `wss://${HIVEMQ_HOST}:${HIVEMQ_PORT}/mqtt`;
-const client = mqtt.connect(brokerUrl, {
-  clientId: 'gantry_web_twin_' + Math.random().toString(16).substring(2, 10),
+// MQTT Setup
+const client = mqtt.connect(`wss://${HIVEMQ_HOST}:${HIVEMQ_PORT}/mqtt`, {
+  clientId: 'gantry_v1_' + Math.random().toString(16).substring(2, 10),
   username: HIVEMQ_USERNAME,
   password: HIVEMQ_PASSWORD,
   clean: true
@@ -193,13 +198,11 @@ const client = mqtt.connect(brokerUrl, {
 client.on('connect', () => {
   const statusElem = document.getElementById('status');
   const dotElem = document.getElementById('dot');
-
   if (statusElem) statusElem.innerText = 'Connected';
   if (dotElem) {
     dotElem.style.backgroundColor = '#4caf50';
     dotElem.style.boxShadow = '0 0 10px #4caf50';
   }
-
   client.subscribe(MQTT_TOPIC);
 });
 
@@ -211,7 +214,5 @@ client.on('message', (topic, message) => {
         axisState[key].target = payload[key];
       }
     });
-  } catch (err) {
-    console.error('[MQTT] Parse error:', err);
-  }
+  } catch (err) {}
 });
