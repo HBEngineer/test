@@ -38,17 +38,17 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.25; // Slightly elevated exposure for clearer visibility
+renderer.toneMappingExposure = 1.35; // Bright tone mapping for crisp metallic sheen
 
 renderer.xr.enabled = true;
 container.appendChild(renderer.domElement);
 
-// --- ENVIRONMENT MAP ---
+// --- ENVIRONMENT MAP (Boosted Reflection Map) ---
 const rgbeLoader = new RGBELoader();
 rgbeLoader.load('https://threejs.org/examples/textures/equirectangular/royal_esplanade_1k.hdr', (texture) => {
   texture.mapping = THREE.EquirectangularReflectionMapping;
   scene.environment = texture;
-  scene.environmentIntensity = 1.8; // Increased reflection brightness
+  scene.environmentIntensity = 2.5; // Stronger environment reflection
 });
 
 if (navigator.xr) {
@@ -68,8 +68,8 @@ if (navigator.xr) {
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
-// --- RECALIBRATED BRIGHT LIGHTING ---
-const keyLight = new THREE.DirectionalLight(0xffffff, 3.0);
+// --- COOL TONE & HIGH CONTRAST LIGHTING SETUP ---
+const keyLight = new THREE.DirectionalLight(0xffffff, 3.2);
 keyLight.position.set(4, 6, 4);
 keyLight.castShadow = true;
 keyLight.shadow.bias = -0.0015;
@@ -83,22 +83,24 @@ keyLight.shadow.camera.top = 3;
 keyLight.shadow.camera.bottom = -3;
 scene.add(keyLight);
 
-const fillLight = new THREE.DirectionalLight(0xe0f0ff, 1.8);
+// Cool blue fill light for subtle metallic tint
+const fillLight = new THREE.DirectionalLight(0xaaccff, 2.5);
 fillLight.position.set(-4, 3, -3);
 scene.add(fillLight);
 
-const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+const ambientLight = new THREE.AmbientLight(0xdbeaff, 0.9);
 scene.add(ambientLight);
 
-const hemiLight = new THREE.HemisphereLight(0xffffff, 0x555555, 0.9);
+// Sky-blue to dark ground hemisphere light
+const hemiLight = new THREE.HemisphereLight(0x87ceeb, 0x333333, 1.2);
 hemiLight.position.set(0, 20, 0);
 scene.add(hemiLight);
 
 const BASE_INTENSITIES = {
-  key: 3.0,
-  fill: 1.8,
-  ambient: 1.2,
-  hemi: 0.9
+  key: 3.2,
+  fill: 2.5,
+  ambient: 0.9,
+  hemi: 1.2
 };
 
 // --- AR GROUP & FLOOR MAT ---
@@ -253,9 +255,10 @@ loader.load(
         child.receiveShadow = true;
 
         if (child.material) {
-          child.material.metalness = 0.75;
-          child.material.roughness = 0.3;
-          child.material.envMapIntensity = 1.8;
+          // High metalness and low roughness for polished silver reflections
+          child.material.metalness = 0.95;
+          child.material.roughness = 0.15;
+          child.material.envMapIntensity = 2.5;
         }
       }
       Object.entries(AXIS_CONFIG).forEach(([key, cfg]) => {
