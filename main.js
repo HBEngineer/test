@@ -21,16 +21,11 @@ const MQTT_TOPIC = "festo/hgosydney/positions";
 const container = document.getElementById('canvas-container');
 
 const scene = new THREE.Scene();
-// TEMPORARY - for console debugging only. Since this file loads as an ES
-// module, its variables aren't normally reachable from the browser console.
-// Safe to delete these two lines once the axis debugging is done.
 window.scene = scene;
 window.THREE = THREE;
 scene.background = new THREE.Color(0xc7ccd1);
 
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-// Rotated 90 degrees to the right from the original (-0.32, 0.83, 0.97)
-// framing, orbiting around the vertical (Y) axis at the same height/distance.
 camera.position.set(0, 0.7, 2.5);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -41,88 +36,64 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 0.5;
-
+renderer.toneMappingExposure = 1.0;
 
 // Enable WebXR
 renderer.xr.enabled = true;
 
 container.appendChild(renderer.domElement);
 
-// Append AR Button (WebXR — Android/Chrome only; iOS uses the separate
-// Quick Look button in index.html instead, since Safari has no WebXR AR).
-// We check support ourselves first, rather than letting ARButton show its
-// default disabled "AR NOT SUPPORTED" button, so unsupported devices see
-// no button at all.
 if (navigator.xr) {
   navigator.xr.isSessionSupported('immersive-ar')
     .then((supported) => {
       if (supported) {
         document.body.appendChild(ARButton.createButton(renderer, {
           requiredFeatures: ['hit-test'],
-          // Without this, regular page DOM (our scanning overlay) is hidden
-          // during the AR session - the XR compositor takes over full-screen
-          // rendering by default. 'root' is the DOM subtree allowed to show.
           optionalFeatures: ['dom-overlay'],
           domOverlay: { root: document.body }
         }));
       }
     })
-    .catch(() => {
-      // Support check itself failed - treat as unsupported, show nothing.
-    });
+    .catch(() => {});
 }
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
 // --- LIGHTING SETUP ---
-const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0);
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.7);
 hemiLight.position.set(20, 20, 20);
 scene.add(hemiLight);
 
-const keyLight = new THREE.DirectionalLight(0xffffff, 4);
+const keyLight = new THREE.DirectionalLight(0xffffff, 2.0);
 keyLight.position.set(4, 6, 4);
-keyLight.castShadow = false //true;
-// Without bias tuning, shadow maps commonly produce "shadow acne" - fine
-// self-shadowing streaks - on surfaces with tight ridges/grooves, like the
-// extrusion's rail profile. These two settings fix that.
+keyLight.castShadow = true;
 keyLight.shadow.bias = -0.0015;
 keyLight.shadow.normalBias = 0.02;
 keyLight.shadow.mapSize.set(2048, 2048);
 scene.add(keyLight);
 
-const fillLight = new THREE.DirectionalLight(0xffffff, 0);
+const fillLight = new THREE.DirectionalLight(0xffffff, 2.0);
 fillLight.position.set(-4, 3, -3);
 scene.add(fillLight);
 
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.35);
+const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
 scene.add(ambientLight);
 
-// Camera light (headlight) - follows the viewer so the side of the model
-// facing the camera is always lit, regardless of orbit angle. Using a
-// directional light (instead of the previous point light) avoids the
-// "on-camera flash" hotspot, where a light sitting at the same position as
-// the camera reflects straight back into the lens off glossy surfaces
-// (this was washing out the blue actuator housings).
-const cameraLight = new THREE.DirectionalLight(0xffffff, 3);  // 1.52);
+const cameraLight = new THREE.DirectionalLight(0xffffff, 1.5);
 camera.add(cameraLight);
-cameraLight.target.position.set(0, 0, -1); // points forward, in the camera's local space
+cameraLight.target.position.set(0, 0, -1);
 camera.add(cameraLight.target);
-scene.add(camera); // camera must be in the scene graph for its child light/target to update
+scene.add(camera);
 
 // Group to hold model and grid
 const arGroup = new THREE.Group();
 scene.add(arGroup);
 
-// --- GRID HELPER ---
+// --- GRID HELPER & SHADOW FLOOR ---
 const gridHelper = new THREE.GridHelper(10, 20, 0xFFFFFF, 0x444444);
 gridHelper.position.y = -0.01;
 
-// Invisible shadow-catching floor - the grid itself is unlit wireframe
-// lines and can't receive shadows, so without this the model casts no
-// visible shadow at all, which was a big part of why it looked flat
-// compared to the reference image (which clearly shows ground shadows).
 const shadowCatcher = new THREE.Mesh(
   new THREE.PlaneGeometry(40, 40),
   new THREE.ShadowMaterial({ opacity: 0.35 })
@@ -137,9 +108,9 @@ let hitTestSource = null;
 let hitTestSourceRequested = false;
 let modelPlaced = false;
 let surfaceCurrentlyDetected = false;
-let firstDetectedAt = null; // when the surface was first seen, for stabilization
-const AUTO_PLACE_STABILIZE_MS = 600; // must track a surface steadily this long before auto-placing
-const hitMatrix = new THREE.Matrix4(); // stores the latest detected surface pose
+let firstDetectedAt = null;
+const AUTO_PLACE_STABILIZE_MS = 600;
+const hitMatrix = new THREE.Matrix4();
 
 const arScanOverlay = document.getElementById('ar-scan-overlay');
 const arScanText = document.getElementById('ar-scan-text');
@@ -162,7 +133,7 @@ function placeModelAt(matrix) {
 renderer.xr.addEventListener('sessionstart', () => {
   scene.background = null;
   gridHelper.visible = false;
-  arGroup.visible = false; // hidden until placed on a detected surface
+  arGroup.visible = false;
   modelPlaced = false;
   surfaceCurrentlyDetected = false;
   firstDetectedAt = null;
@@ -170,6 +141,7 @@ renderer.xr.addEventListener('sessionstart', () => {
   hitTestSource = null;
   showArScanOverlay('Starting AR...');
 });
+
 renderer.xr.addEventListener('sessionend', () => {
   scene.background = new THREE.Color(document.getElementById('ctrl-bg-color').value);
   gridHelper.visible = true;
@@ -177,8 +149,6 @@ renderer.xr.addEventListener('sessionend', () => {
   hideArScanOverlay();
 });
 
-// --- CONTROLLER (tap to reposition the model onto wherever you're currently
-// pointing, in case the auto-detected surface wasn't the one you wanted) ---
 const controller = renderer.xr.getController(0);
 controller.addEventListener('select', () => {
   if (surfaceCurrentlyDetected) {
@@ -194,7 +164,6 @@ scene.add(controller);
 // ==========================================
 const lightPanel = document.getElementById('light-panel');
 const panelHeader = document.getElementById('light-panel-header');
-const toggleIcon = document.getElementById('toggle-icon');
 
 panelHeader.addEventListener('click', () => {
   lightPanel.classList.toggle('collapsed');
@@ -202,20 +171,14 @@ panelHeader.addEventListener('click', () => {
 
 const LIGHTING_STORAGE_KEY = 'gantryDigitalTwin.lightingDefaults';
 
-// The values the scene was originally authored with. "Reset to Factory"
-// always returns to this configuration, regardless of what's been saved.
 const FACTORY_LIGHTING_CONFIG = {
-  hemi: { intensity: 0.6, position: { x: 20, y: 20, z: 20 } },
-  key: { intensity: 3.5, color: '#ffffff', position: { x: 4, y: 6, z: 4 } },
-  fill: { intensity: 1.5, color: '#ffffff', position: { x: -4, y: 3, z: -3 } },
-  ambient: { intensity: 0.4, color: '#ffffff' },
+  hemi: { intensity: 0.7, position: { x: 20, y: 20, z: 20 } },
+  key: { intensity: 2.0, color: '#ffffff', position: { x: 4, y: 6, z: 4 } },
+  fill: { intensity: 2.0, color: '#ffffff', position: { x: -4, y: 3, z: -3 } },
+  ambient: { intensity: 1.0, color: '#ffffff' },
   background: '#c7ccd1'
 };
 
-// Maps each slider/color input id to a (light, property) setter, and each
-// value to the label element that displays it. Keeping this table-driven
-// means adding another controllable light later only needs an entry here
-// plus matching markup in index.html.
 const lightControlBindings = [
   { id: 'ctrl-hemi', labelId: 'lbl-hemi', decimals: 1, apply: (v) => { hemiLight.intensity = v; } },
   { id: 'ctrl-hemi-x', labelId: 'lbl-hemi-x', decimals: 1, apply: (v) => { hemiLight.position.x = v; } },
@@ -248,8 +211,6 @@ lightControlBindings.forEach(({ id, labelId, decimals, apply }) => {
   });
 });
 
-// Color pickers (separate from the table above since they read a hex string,
-// not a float, and don't drive a numeric label).
 document.getElementById('ctrl-key-color').addEventListener('input', (e) => {
   keyLight.color.set(e.target.value);
 });
@@ -267,8 +228,6 @@ document.getElementById('ctrl-bg-color').addEventListener('input', (e) => {
     scene.background.set(e.target.value);
   }
 });
-
-// --- Reading / applying a full lighting configuration ---
 
 function readCurrentLightingConfig() {
   return {
@@ -316,8 +275,6 @@ function applyLightingConfig(config) {
   syncLightingUI(config);
 }
 
-// Pushes a config's values into every slider/color input and label so the
-// panel reflects whatever was just applied (on load, or after a reset).
 function syncLightingUI(config) {
   const setRange = (id, labelId, value, decimals) => {
     const input = document.getElementById(id);
@@ -361,8 +318,6 @@ function showSaveStatus(message) {
   showSaveStatus._timer = setTimeout(() => { statusElem.innerText = ''; }, 2500);
 }
 
-// --- Save / Reset buttons ---
-
 document.getElementById('btn-save-default').addEventListener('click', () => {
   const config = readCurrentLightingConfig();
   try {
@@ -394,8 +349,6 @@ document.getElementById('btn-load-factory').addEventListener('click', () => {
   showSaveStatus('Factory defaults restored');
 });
 
-// On startup, use a saved default if one exists; otherwise the scene keeps
-// the factory values it was already constructed with above.
 (function initLightingFromSavedDefault() {
   const saved = localStorage.getItem(LIGHTING_STORAGE_KEY);
   if (saved) {
@@ -412,43 +365,17 @@ document.getElementById('btn-load-factory').addEventListener('click', () => {
 // ==========================================
 // 4. LOAD GLB MODEL
 // ==========================================
-// Maps each MQTT payload key to the GLB node it drives and the LOCAL axis
-// that node moves along. Since this model is correctly kinematized (each
-// slide nested under the one it rides on), each node only ever needs to
-// move along a single local axis - the parenting handles the rest.
-//
-// IMPORTANT: "Slide_X" moving along local X is an assumption based on the
-// name, not a guarantee - glTF's Y-up export convention can remap which
-// local axis corresponds to a given real-world direction. If testing shows
-// a slide moving the wrong way (or not at all), just change the `axis`
-// value below for that entry - nothing else needs to change.
 const AXIS_CONFIG = {
   PosX: { nodeName: 'Slide_X', axis: 'z', valueElementId: 'val-x', sign: 1 },
-  // Slide_X has a 90-degree rotation baked in, inherited by everything
-  // nested under it (Slide_Y, Slide_Z). That rotation swaps which local
-  // axis points along world X vs world Z (world Y/vertical is unaffected).
-  // Slide_Y's local X is the one that actually points along world Z here.
   PosY: { nodeName: 'Slide_Y', axis: 'x', valueElementId: 'val-y', sign: -1 },
-  PosZ: { nodeName: 'Slide_Z', axis: 'y', valueElementId: 'val-z', sign: -1 } // confirmed correct - vertical (world Y) is unaffected by the rotation
+  PosZ: { nodeName: 'Slide_Z', axis: 'y', valueElementId: 'val-z', sign: -1 }
 };
 
-// Populated once the model loads: { PosX: { node, axis, initial, target }, ... }
 const axisState = {};
-
-// MQTT payload values are in millimeters, but glTF/GLB world units are
-// meters by convention - confirmed empirically ({"PosX": 1} moved 1 full
-// meter instead of 1mm). This converts mm -> m before applying as a
-// position offset.
 const SCALE_FACTOR = 0.001;
 const LERP_FACTOR = 0.05;
 const MODEL_URL = './model/hgosydney_Kinetic.glb';
 
-// Shared with ar-iphone.js (a separate, non-module script - see that file
-// for why). This is the single source of truth for axis mapping and
-// scaling, and mqttTargets is the live feed of MQTT-derived positions, so
-// the iPhone AR path's independent model copy stays driven by the exact
-// same data as this desktop/Android scene, without duplicating the MQTT
-// connection or hardcoding a second copy of these constants.
 window.GANTRY_CONFIG = {
   AXIS_CONFIG,
   SCALE_FACTOR,
@@ -482,8 +409,6 @@ loader.load(
       });
     });
 
-    // Log a warning for any configured axis whose node wasn't found in the
-    // model - much easier to spot than a silently-motionless slide later.
     Object.entries(AXIS_CONFIG).forEach(([key, cfg]) => {
       if (!axisState[key]) {
         console.warn(`[MODEL] Node "${cfg.nodeName}" (for ${key}) was not found in the GLB.`);
@@ -519,7 +444,6 @@ function animate(timestamp, frame) {
     node.position[axis] += (targetValue - node.position[axis]) * LERP_FACTOR;
   });
 
-  // --- WebXR hit-test: find real-world surfaces, auto-place on first detection ---
   if (renderer.xr.isPresenting && frame) {
     const session = renderer.xr.getSession();
     const referenceSpace = renderer.xr.getReferenceSpace();
@@ -549,12 +473,6 @@ function animate(timestamp, frame) {
         surfaceCurrentlyDetected = true;
 
         if (!modelPlaced) {
-          // Don't trust the very first hit - tracking is often noisy for a
-          // moment right after a surface is found. Require it to stay
-          // steady for AUTO_PLACE_STABILIZE_MS before committing, which is
-          // what was actually happening implicitly before (the user took a
-          // moment to aim before tapping) and is why placement felt more
-          // stable in the tap-to-place version.
           if (firstDetectedAt === null) {
             firstDetectedAt = timestamp;
             showArScanOverlay('Hold steady...');
@@ -567,8 +485,6 @@ function animate(timestamp, frame) {
       } else {
         surfaceCurrentlyDetected = false;
         if (!modelPlaced) {
-          // Lost tracking before we finished stabilizing - reset the timer
-          // rather than placing based on a stale/interrupted read.
           firstDetectedAt = null;
           showArScanOverlay('Move your phone to find a surface');
         }
@@ -580,7 +496,6 @@ function animate(timestamp, frame) {
   renderer.render(scene, camera);
 }
 
-// Handles both desktop and WebXR loops
 renderer.setAnimationLoop(animate);
 
 window.addEventListener('resize', () => {
@@ -593,8 +508,8 @@ window.addEventListener('resize', () => {
 // 6. UPDATE TARGET VALUES FROM MQTT
 // ==========================================
 function updateAxisPosition(key, positionVal) {
-  window.GANTRY_CONFIG.mqttTargets[key] = positionVal; // shared with ar-iphone.js regardless of this scene's own node state
-  if (!axisState[key]) return; // node wasn't found in the GLB - see console warning at load time
+  window.GANTRY_CONFIG.mqttTargets[key] = positionVal;
+  if (!axisState[key]) return;
   axisState[key].target = positionVal;
   const valElem = document.getElementById(AXIS_CONFIG[key].valueElementId);
   if (valElem) valElem.innerText = `${positionVal} mm`;
