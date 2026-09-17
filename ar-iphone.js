@@ -64,33 +64,11 @@
     return { width: window.innerWidth, height: window.innerHeight };
   };
 
-  const resizeCanvasToWindow = () => {
-    if (!canvas) return;
-    const { width, height } = getViewportSize();
-    // No devicePixelRatio multiplication - confirmed via isolated testing
-    // that this was the actual cause of the "zoomed" camera view. 8th Wall
-    // expects canvas.width/height to match CSS pixels 1:1, not a DPR-scaled
-    // backing store. No !important either - that fights 8th Wall's own
-    // internal canvas sizing after it takes ownership post-XR8.run().
-    canvas.width = width;
-    canvas.height = height;
-    canvas.style.width = width + 'px';
-    canvas.style.height = height + 'px';
-    canvas.style.position = 'fixed';
-    canvas.style.top = '0';
-    canvas.style.left = '0';
-  };
-
-  const startResizeSafetyNet = () => {
-    const start = Date.now();
-    resizeSafetyNetInterval = setInterval(() => {
-      // DISABLED for testing - resizeCanvasToWindow();
-      if (Date.now() - start > 5000) {
-        clearInterval(resizeSafetyNetInterval);
-        resizeSafetyNetInterval = null;
-      }
-    }, 250);
-  };
+  // Manual canvas resize code removed - XRExtras.FullWindowCanvas.pipelineModule()
+  // (added to the pipeline below) is the official 8th Wall solution for this,
+  // and properly syncs across orientation changes, which our hand-rolled
+  // version never did correctly (that was the root cause of the small-canvas,
+  // deformation, and trembling symptoms).
 
   // --- Hide/show the rest of the app's UI while in live AR, so nothing
   // overlaps the full-screen camera feed ---
@@ -121,7 +99,6 @@
 
       onStart: ({ canvas: pipelineCanvas }) => {
         try {
-          // DISABLED for testing - resizeCanvasToWindow();
 
           const cfg = window.GANTRY_CONFIG;
           if (!cfg) {
@@ -196,7 +173,6 @@
               });
 
               arGroup.add(model);
-              // DISABLED for testing - nudge8thWallResize(); // model just became visible-capable - sync 8th Wall's internal camera now, not on a fixed timer unrelated to load time
               setOverlayText('Move your phone to find a surface, then tap it.');
             },
             (xhr) => {
@@ -231,7 +207,6 @@
               arGroup.position.set(position.x, position.y, position.z);
               arGroup.quaternion.identity(); // a single FEATURE_POINT hit's rotation isn't reliably clean and was causing the model to render skewed/deformed on placement
               arGroup.visible = true;
-              // DISABLED for testing - nudge8thWallResize(); // sync again right at the moment of first placement
               placed = true;
               hideOverlay();
             }
@@ -264,20 +239,11 @@
     setOverlayText('Starting AR...');
     showOverlay();
 
-    const nudge8thWallResize = () => {
-    window.dispatchEvent(new Event('resize'));
-    window.dispatchEvent(new Event('orientationchange'));
-  };
-
-  window.addEventListener('resize', resizeCanvasToWindow);
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', resizeCanvasToWindow);
-    }
-
     const startEngine = () => {
       if (!modulesAdded) {
         XR8.addCameraPipelineModules([
           XR8.GlTextureRenderer.pipelineModule(), // draws the camera feed
+          XRExtras.FullWindowCanvas.pipelineModule(), // official 8th Wall module: keeps the canvas correctly filling the window across orientation changes - replaces our hand-rolled resize code, which was causing the small-canvas/deformation/trembling symptoms
           XR8.Threejs.pipelineModule(),           // creates the AR three.js scene
           XR8.XrController.pipelineModule(),      // enables SLAM world tracking
           gantryArPipelineModule()
