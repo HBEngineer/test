@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 import { ARButton } from 'three/addons/webxr/ARButton.js';
 
 // ==========================================
@@ -42,6 +43,13 @@ renderer.toneMappingExposure = 1.0;
 renderer.xr.enabled = true;
 
 container.appendChild(renderer.domElement);
+
+// --- ENVIRONMENT MAP (HDRI FOR METALLIC REFLECTIONS) ---
+const rgbeLoader = new RGBELoader();
+rgbeLoader.load('https://threejs.org/examples/textures/equirectangular/royal_esplanade_1k.hdr', (texture) => {
+  texture.mapping = THREE.EquirectangularReflectionMapping;
+  scene.environment = texture;
+});
 
 if (navigator.xr) {
   navigator.xr.isSessionSupported('immersive-ar')
@@ -96,7 +104,7 @@ gridHelper.position.y = -0.01;
 
 const shadowCatcher = new THREE.Mesh(
   new THREE.PlaneGeometry(40, 40),
-  new THREE.ShadowMaterial({ opacity: 0.35 })
+  new THREE.ShadowMaterial({ opacity: 0.15 })
 );
 shadowCatcher.rotation.x = -Math.PI / 2;
 shadowCatcher.receiveShadow = true;
@@ -395,6 +403,12 @@ loader.load(
       if (child.isMesh) {
         child.castShadow = true;
         child.receiveShadow = true;
+
+        if (child.material) {
+          child.material.metalness = 0.85;
+          child.material.roughness = 0.25;
+          child.material.envMapIntensity = 1.2;
+        }
       }
       Object.entries(AXIS_CONFIG).forEach(([key, cfg]) => {
         if (child.name === cfg.nodeName) {
