@@ -34,26 +34,28 @@ camera.position.set(0, 0.7, 2.5);
 scene.add(camera);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+window.renderer = renderer; // Exposed to window so console controls work live
+
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-// UPDATED: Replaced deprecated renderer.outputEncoding with renderer.outputColorSpace
+// Fixed outputColorSpace property (replaces deprecated outputEncoding)
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.65; // Boosted exposure for brighter reflective highlights
+renderer.toneMappingExposure = 1.0; // Lowered default tone mapping exposure
 
 renderer.xr.enabled = true;
 container.appendChild(renderer.domElement);
 
-// --- ENVIRONMENT MAP (High Intensity Reflections) ---
-
+// --- ENVIRONMENT MAP (HDR Reflections) ---
 const rgbeLoader = new RGBELoader();
+// Updated to working CDN URL
 rgbeLoader.load('https://cdn.jsdelivr.net/gh/mrdoob/three.js@dev/examples/textures/equirectangular/venice_sunset_1k.hdr', (texture) => {
   texture.mapping = THREE.EquirectangularReflectionMapping;
   scene.environment = texture;
-  scene.environmentIntensity = 1;
+  scene.environmentIntensity = 1.0; // Lowered default reflection intensity (try values like 0.5 - 1.0)
 });
 
 if (navigator.xr) {
@@ -265,10 +267,10 @@ loader.load(
         child.receiveShadow = true;
 
         if (child.material) {
-          // Polished metallic finish with enhanced environment map intensity
+          // Polished metallic finish
           child.material.metalness = 0.90;
           child.material.roughness = 0.18;
-          child.material.envMapIntensity = 3.5;
+          child.material.envMapIntensity = 1.0; // Lowered from 3.5 to match environment settings
         }
       }
       Object.entries(AXIS_CONFIG).forEach(([key, cfg]) => {
