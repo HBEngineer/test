@@ -39,7 +39,8 @@ renderer.setPixelRatio(window.devicePixelRatio);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-renderer.outputEncoding = THREE.sRGBEncoding;
+// UPDATED: Replaced deprecated renderer.outputEncoding with renderer.outputColorSpace
+renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.65; // Boosted exposure for brighter reflective highlights
 
@@ -47,8 +48,9 @@ renderer.xr.enabled = true;
 container.appendChild(renderer.domElement);
 
 // --- ENVIRONMENT MAP (High Intensity Reflections) ---
+// UPDATED: Replaced 404 URL with raw github CDN link for royal_esplanade_1k.hdr
 const rgbeLoader = new RGBELoader();
-rgbeLoader.load('https://threejs.org/examples/textures/equirectangular/royal_esplanade_1k.hdr', (texture) => {
+rgbeLoader.load('https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/equirectangular/royal_esplanade_1k.hdr', (texture) => {
   texture.mapping = THREE.EquirectangularReflectionMapping;
   scene.environment = texture;
   scene.environmentIntensity = 3.5; // Lifted reflection strength for intense metallic shine
