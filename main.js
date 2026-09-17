@@ -30,6 +30,9 @@ scene.background = new THREE.Color(0x2b2b2b);
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.position.set(0, 0.7, 2.5);
 
+// Add Camera to Scene so attached lights track camera movements
+scene.add(camera);
+
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
@@ -38,17 +41,17 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.6; // Increased exposure to brighten dark areas
+renderer.toneMappingExposure = 1.65; // Boosted exposure for brighter reflective highlights
 
 renderer.xr.enabled = true;
 container.appendChild(renderer.domElement);
 
-// --- ENVIRONMENT MAP (Boosted Reflection Map) ---
+// --- ENVIRONMENT MAP (High Intensity Reflections) ---
 const rgbeLoader = new RGBELoader();
 rgbeLoader.load('https://threejs.org/examples/textures/equirectangular/royal_esplanade_1k.hdr', (texture) => {
   texture.mapping = THREE.EquirectangularReflectionMapping;
   scene.environment = texture;
-  scene.environmentIntensity = 3.0; // High reflection brightness
+  scene.environmentIntensity = 3.5; // Lifted reflection strength for intense metallic shine
 });
 
 if (navigator.xr) {
@@ -68,8 +71,13 @@ if (navigator.xr) {
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
-// --- BRIGHTER COOL TONE LIGHTING ---
-const keyLight = new THREE.DirectionalLight(0xffffff, 4.5); // Boosted key light
+// --- DYNAMIC CAMERA LIGHT (Follows Viewpoint) ---
+const cameraLight = new THREE.DirectionalLight(0xffffff, 2.2);
+cameraLight.position.set(0, 0, 1); // Offset slightly forward from camera lens
+camera.add(cameraLight);
+
+// --- SCENE LIGHTING SETUP ---
+const keyLight = new THREE.DirectionalLight(0xffffff, 4.0);
 keyLight.position.set(4, 6, 4);
 keyLight.castShadow = true;
 keyLight.shadow.bias = -0.0015;
@@ -83,25 +91,23 @@ keyLight.shadow.camera.top = 3;
 keyLight.shadow.camera.bottom = -3;
 scene.add(keyLight);
 
-// Cool blue fill light with elevated intensity
-const fillLight = new THREE.DirectionalLight(0xbbe0ff, 3.2);
+const fillLight = new THREE.DirectionalLight(0xbbe0ff, 3.0);
 fillLight.position.set(-4, 3, -3);
 scene.add(fillLight);
 
-// Ambient light boosted for shadow clarity
 const ambientLight = new THREE.AmbientLight(0xedf5ff, 1.8);
 scene.add(ambientLight);
 
-// Hemisphere light lifted for bright sky reflections
 const hemiLight = new THREE.HemisphereLight(0xb0e0e6, 0x555555, 1.6);
 hemiLight.position.set(0, 20, 0);
 scene.add(hemiLight);
 
 const BASE_INTENSITIES = {
-  key: 4.5,
-  fill: 3.2,
+  key: 4.0,
+  fill: 3.0,
   ambient: 1.8,
-  hemi: 1.6
+  hemi: 1.6,
+  camera: 2.2
 };
 
 // --- AR GROUP & FLOOR MAT ---
@@ -203,6 +209,7 @@ if (ctrlBrightness) {
     fillLight.intensity = BASE_INTENSITIES.fill * scale;
     ambientLight.intensity = BASE_INTENSITIES.ambient * scale;
     hemiLight.intensity = BASE_INTENSITIES.hemi * scale;
+    cameraLight.intensity = BASE_INTENSITIES.camera * scale;
     if (lblBrightness) lblBrightness.innerText = `${Math.round(scale * 100)}%`;
   });
 }
@@ -256,9 +263,10 @@ loader.load(
         child.receiveShadow = true;
 
         if (child.material) {
-          child.material.metalness = 0.85;
-          child.material.roughness = 0.2;
-          child.material.envMapIntensity = 2.8;
+          // Polished metallic finish with enhanced environment map intensity
+          child.material.metalness = 0.90;
+          child.material.roughness = 0.18;
+          child.material.envMapIntensity = 3.5;
         }
       }
       Object.entries(AXIS_CONFIG).forEach(([key, cfg]) => {
