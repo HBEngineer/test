@@ -24,7 +24,9 @@ const container = document.getElementById('canvas-container');
 const scene = new THREE.Scene();
 window.scene = scene;
 window.THREE = THREE;
-scene.background = new THREE.Color(0xc7ccd1);
+
+// Dark background matching reference image
+scene.background = new THREE.Color(0x2b2b2b);
 
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.position.set(0, 0.7, 2.5);
@@ -39,12 +41,10 @@ renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
 
-// Enable WebXR
 renderer.xr.enabled = true;
-
 container.appendChild(renderer.domElement);
 
-// --- ENVIRONMENT MAP (HDRI FOR METALLIC REFLECTIONS) ---
+// --- ENVIRONMENT MAP ---
 const rgbeLoader = new RGBELoader();
 rgbeLoader.load('https://threejs.org/examples/textures/equirectangular/royal_esplanade_1k.hdr', (texture) => {
   texture.mapping = THREE.EquirectangularReflectionMapping;
@@ -69,55 +69,53 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
 // --- LIGHTING SETUP ---
-const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.7);
-hemiLight.position.set(20, 20, 20);
-scene.add(hemiLight);
-
 const keyLight = new THREE.DirectionalLight(0xffffff, 2.0);
 keyLight.position.set(4, 6, 4);
 keyLight.castShadow = true;
 keyLight.shadow.bias = -0.0015;
 keyLight.shadow.normalBias = 0.02;
 keyLight.shadow.mapSize.set(2048, 2048);
-
-// Expand shadow camera frustum so full model casts shadows
 keyLight.shadow.camera.near = 0.5;
 keyLight.shadow.camera.far = 15;
 keyLight.shadow.camera.left = -3;
 keyLight.shadow.camera.right = 3;
 keyLight.shadow.camera.top = 3;
 keyLight.shadow.camera.bottom = -3;
-
 scene.add(keyLight);
 
-const fillLight = new THREE.DirectionalLight(0xffffff, 2.0);
+const fillLight = new THREE.DirectionalLight(0xffffff, 1.2);
 fillLight.position.set(-4, 3, -3);
 scene.add(fillLight);
 
-const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
 scene.add(ambientLight);
 
-const cameraLight = new THREE.DirectionalLight(0xffffff, 1.5);
-camera.add(cameraLight);
-cameraLight.target.position.set(0, 0, -1);
-camera.add(cameraLight.target);
-scene.add(camera);
+// Base intensity multipliers for master brightness scaling
+const BASE_INTENSITIES = {
+  key: 2.0,
+  fill: 1.2,
+  ambient: 0.8
+};
 
-// Group to hold model and grid
+// --- AR GROUP & FLOOR MAT ---
 const arGroup = new THREE.Group();
 scene.add(arGroup);
 
-// --- GRID HELPER & SHADOW FLOOR ---
-const gridHelper = new THREE.GridHelper(10, 20, 0xFFFFFF, 0x444444);
-gridHelper.position.y = -0.01;
+// Clear light floor mesh matching reference picture
+const floorGeo = new THREE.PlaneGeometry(10, 10);
+const floorMat = new THREE.MeshStandardMaterial({
+  color: 0xdcdcdc,
+  roughness: 0.8,
+  metalness: 0.1
+});
+const floorMesh = new THREE.Mesh(floorGeo, floorMat);
+floorMesh.rotation.x = -Math.PI / 2;
+floorMesh.receiveShadow = true;
+arGroup.add(floorMesh);
 
-const shadowCatcher = new THREE.Mesh(
-  new THREE.PlaneGeometry(40, 40),
-  new THREE.ShadowMaterial({ opacity: 0.2 })
-);
-shadowCatcher.rotation.x = -Math.PI / 2;
-shadowCatcher.receiveShadow = true;
-arGroup.add(shadowCatcher);
+// Light grid overlay over floor plane
+const gridHelper = new THREE.GridHelper(10, 10, 0xbbbbbb, 0xcccccc);
+gridHelper.position.y = 0.001; // Slightly above floor mesh to prevent z-fighting
 arGroup.add(gridHelper);
 
 // WebXR Session handlers
@@ -149,6 +147,7 @@ function placeModelAt(matrix) {
 
 renderer.xr.addEventListener('sessionstart', () => {
   scene.background = null;
+  floorMesh.visible = false;
   gridHelper.visible = false;
   arGroup.visible = false;
   modelPlaced = false;
@@ -160,7 +159,8 @@ renderer.xr.addEventListener('sessionstart', () => {
 });
 
 renderer.xr.addEventListener('sessionend', () => {
-  scene.background = new THREE.Color(document.getElementById('ctrl-bg-color').value);
+  scene.background = new THREE.Color(0x2b2b2b);
+  floorMesh.visible = true;
   gridHelper.visible = true;
   arGroup.visible = true;
   hideArScanOverlay();
@@ -177,208 +177,45 @@ controller.addEventListener('select', () => {
 scene.add(controller);
 
 // ==========================================
-// 3. RETRACTABLE UI & LIGHT CONTROL BINDINGS
+// 3. SIMPLIFIED USER LIGHT CONTROLS
 // ==========================================
 const lightPanel = document.getElementById('light-panel');
 const panelHeader = document.getElementById('light-panel-header');
 
-panelHeader.addEventListener('click', () => {
-  lightPanel.classList.toggle('collapsed');
-});
-
-const LIGHTING_STORAGE_KEY = 'gantryDigitalTwin.lightingDefaults';
-
-// Updated Factory Defaults matching current active setup
-const FACTORY_LIGHTING_CONFIG = {
-  hemi: { intensity: 0.7, position: { x: 20, y: 20, z: 20 } },
-  key: { intensity: 2.0, color: '#ffffff', position: { x: 4, y: 6, z: 4 } },
-  fill: { intensity: 2.0, color: '#ffffff', position: { x: -4, y: 3, z: -3 } },
-  ambient: { intensity: 1.0, color: '#ffffff' },
-  background: '#c7ccd1'
-};
-
-const lightControlBindings = [
-  { id: 'ctrl-hemi', labelId: 'lbl-hemi', decimals: 1, apply: (v) => { hemiLight.intensity = v; } },
-  { id: 'ctrl-hemi-x', labelId: 'lbl-hemi-x', decimals: 1, apply: (v) => { hemiLight.position.x = v; } },
-  { id: 'ctrl-hemi-y', labelId: 'lbl-hemi-y', decimals: 1, apply: (v) => { hemiLight.position.y = v; } },
-  { id: 'ctrl-hemi-z', labelId: 'lbl-hemi-z', decimals: 1, apply: (v) => { hemiLight.position.z = v; } },
-
-  { id: 'ctrl-key', labelId: 'lbl-key', decimals: 1, apply: (v) => { keyLight.intensity = v; } },
-  { id: 'ctrl-key-x', labelId: 'lbl-key-x', decimals: 1, apply: (v) => { keyLight.position.x = v; } },
-  { id: 'ctrl-key-y', labelId: 'lbl-key-y', decimals: 1, apply: (v) => { keyLight.position.y = v; } },
-  { id: 'ctrl-key-z', labelId: 'lbl-key-z', decimals: 1, apply: (v) => { keyLight.position.z = v; } },
-
-  { id: 'ctrl-fill', labelId: 'lbl-fill', decimals: 1, apply: (v) => { fillLight.intensity = v; } },
-  { id: 'ctrl-fill-x', labelId: 'lbl-fill-x', decimals: 1, apply: (v) => { fillLight.position.x = v; } },
-  { id: 'ctrl-fill-y', labelId: 'lbl-fill-y', decimals: 1, apply: (v) => { fillLight.position.y = v; } },
-  { id: 'ctrl-fill-z', labelId: 'lbl-fill-z', decimals: 1, apply: (v) => { fillLight.position.z = v; } },
-
-  { id: 'ctrl-ambient', labelId: 'lbl-ambient', decimals: 1, apply: (v) => { ambientLight.intensity = v; } }
-];
-
-lightControlBindings.forEach(({ id, labelId, decimals, apply }) => {
-  const input = document.getElementById(id);
-  if (!input) return;
-  input.addEventListener('input', (e) => {
-    const val = parseFloat(e.target.value);
-    apply(val);
-    if (labelId) {
-      const label = document.getElementById(labelId);
-      if (label) label.innerText = val.toFixed(decimals);
-    }
+if (panelHeader && lightPanel) {
+  panelHeader.addEventListener('click', () => {
+    lightPanel.classList.toggle('collapsed');
   });
-});
-
-document.getElementById('ctrl-key-color').addEventListener('input', (e) => {
-  keyLight.color.set(e.target.value);
-});
-
-document.getElementById('ctrl-fill-color').addEventListener('input', (e) => {
-  fillLight.color.set(e.target.value);
-});
-
-document.getElementById('ctrl-ambient-color').addEventListener('input', (e) => {
-  ambientLight.color.set(e.target.value);
-});
-
-document.getElementById('ctrl-bg-color').addEventListener('input', (e) => {
-  if (!renderer.xr.isPresenting) {
-    scene.background.set(e.target.value);
-  }
-});
-
-function readCurrentLightingConfig() {
-  return {
-    hemi: {
-      intensity: hemiLight.intensity,
-      position: { x: hemiLight.position.x, y: hemiLight.position.y, z: hemiLight.position.z }
-    },
-    key: {
-      intensity: keyLight.intensity,
-      color: '#' + keyLight.color.getHexString(),
-      position: { x: keyLight.position.x, y: keyLight.position.y, z: keyLight.position.z }
-    },
-    fill: {
-      intensity: fillLight.intensity,
-      color: '#' + fillLight.color.getHexString(),
-      position: { x: fillLight.position.x, y: fillLight.position.y, z: fillLight.position.z }
-    },
-    ambient: {
-      intensity: ambientLight.intensity,
-      color: '#' + ambientLight.color.getHexString()
-    },
-    background: '#' + scene.background.getHexString()
-  };
 }
 
-function applyLightingConfig(config) {
-  hemiLight.intensity = config.hemi.intensity;
-  hemiLight.position.set(config.hemi.position.x, config.hemi.position.y, config.hemi.position.z);
+// Master Brightness Control (0.1 to 2.0x multiplier)
+const ctrlBrightness = document.getElementById('ctrl-brightness');
+const lblBrightness = document.getElementById('lbl-brightness');
 
-  keyLight.intensity = config.key.intensity;
-  keyLight.color.set(config.key.color);
-  keyLight.position.set(config.key.position.x, config.key.position.y, config.key.position.z);
-
-  fillLight.intensity = config.fill.intensity;
-  fillLight.color.set(config.fill.color);
-  fillLight.position.set(config.fill.position.x, config.fill.position.y, config.fill.position.z);
-
-  ambientLight.intensity = config.ambient.intensity;
-  ambientLight.color.set(config.ambient.color);
-
-  if (!renderer.xr.isPresenting) {
-    scene.background.set(config.background);
-  }
-
-  syncLightingUI(config);
+if (ctrlBrightness) {
+  ctrlBrightness.addEventListener('input', (e) => {
+    const scale = parseFloat(e.target.value);
+    keyLight.intensity = BASE_INTENSITIES.key * scale;
+    fillLight.intensity = BASE_INTENSITIES.fill * scale;
+    ambientLight.intensity = BASE_INTENSITIES.ambient * scale;
+    if (lblBrightness) lblBrightness.innerText = `${Math.round(scale * 100)}%`;
+  });
 }
 
-function syncLightingUI(config) {
-  const setRange = (id, labelId, value, decimals) => {
-    const input = document.getElementById(id);
-    if (input) input.value = value;
-    const label = document.getElementById(labelId);
-    if (label) label.innerText = value.toFixed(decimals);
-  };
-  const setColor = (id, value) => {
-    const input = document.getElementById(id);
-    if (input) input.value = value;
-  };
+// Light Angle Control (Rotate key light position around Y axis in degrees)
+const ctrlAngle = document.getElementById('ctrl-angle');
+const lblAngle = document.getElementById('lbl-angle');
+const LIGHT_RADIUS = 7.2; // Original light radial distance
 
-  setRange('ctrl-hemi', 'lbl-hemi', config.hemi.intensity, 1);
-  setRange('ctrl-hemi-x', 'lbl-hemi-x', config.hemi.position.x, 1);
-  setRange('ctrl-hemi-y', 'lbl-hemi-y', config.hemi.position.y, 1);
-  setRange('ctrl-hemi-z', 'lbl-hemi-z', config.hemi.position.z, 1);
-
-  setRange('ctrl-key', 'lbl-key', config.key.intensity, 1);
-  setColor('ctrl-key-color', config.key.color);
-  setRange('ctrl-key-x', 'lbl-key-x', config.key.position.x, 1);
-  setRange('ctrl-key-y', 'lbl-key-y', config.key.position.y, 1);
-  setRange('ctrl-key-z', 'lbl-key-z', config.key.position.z, 1);
-
-  setRange('ctrl-fill', 'lbl-fill', config.fill.intensity, 1);
-  setColor('ctrl-fill-color', config.fill.color);
-  setRange('ctrl-fill-x', 'lbl-fill-x', config.fill.position.x, 1);
-  setRange('ctrl-fill-y', 'lbl-fill-y', config.fill.position.y, 1);
-  setRange('ctrl-fill-z', 'lbl-fill-z', config.fill.position.z, 1);
-
-  setRange('ctrl-ambient', 'lbl-ambient', config.ambient.intensity, 1);
-  setColor('ctrl-ambient-color', config.ambient.color);
-
-  setColor('ctrl-bg-color', config.background);
+if (ctrlAngle) {
+  ctrlAngle.addEventListener('input', (e) => {
+    const deg = parseFloat(e.target.value);
+    const rad = (deg * Math.PI) / 180;
+    keyLight.position.x = Math.cos(rad) * LIGHT_RADIUS;
+    keyLight.position.z = Math.sin(rad) * LIGHT_RADIUS;
+    if (lblAngle) lblAngle.innerText = `${Math.round(deg)}°`;
+  });
 }
-
-function showSaveStatus(message) {
-  const statusElem = document.getElementById('save-status');
-  if (!statusElem) return;
-  statusElem.innerText = message;
-  clearTimeout(showSaveStatus._timer);
-  showSaveStatus._timer = setTimeout(() => { statusElem.innerText = ''; }, 2500);
-}
-
-document.getElementById('btn-save-default').addEventListener('click', () => {
-  const config = readCurrentLightingConfig();
-  try {
-    localStorage.setItem(LIGHTING_STORAGE_KEY, JSON.stringify(config));
-    showSaveStatus('Saved as default \u2713');
-  } catch (err) {
-    console.error('[LIGHTING] Failed to save default config:', err);
-    showSaveStatus('Save failed');
-  }
-});
-
-document.getElementById('btn-load-default').addEventListener('click', () => {
-  const saved = localStorage.getItem(LIGHTING_STORAGE_KEY);
-  if (!saved) {
-    showSaveStatus('No saved default yet');
-    return;
-  }
-  try {
-    applyLightingConfig(JSON.parse(saved));
-    showSaveStatus('Default loaded');
-  } catch (err) {
-    console.error('[LIGHTING] Failed to load saved config:', err);
-    showSaveStatus('Load failed');
-  }
-});
-
-document.getElementById('btn-load-factory').addEventListener('click', () => {
-  applyLightingConfig(FACTORY_LIGHTING_CONFIG);
-  showSaveStatus('Factory defaults restored');
-});
-
-(function initLightingFromSavedDefault() {
-  const saved = localStorage.getItem(LIGHTING_STORAGE_KEY);
-  if (saved) {
-    try {
-      applyLightingConfig(JSON.parse(saved));
-      return;
-    } catch (err) {
-      console.warn('[LIGHTING] Saved config was invalid, using factory defaults:', err);
-    }
-  }
-  syncLightingUI(FACTORY_LIGHTING_CONFIG);
-})();
 
 // ==========================================
 // 4. LOAD GLB MODEL
@@ -433,27 +270,17 @@ loader.load(
       });
     });
 
-    Object.entries(AXIS_CONFIG).forEach(([key, cfg]) => {
-      if (!axisState[key]) {
-        console.warn(`[MODEL] Node "${cfg.nodeName}" (for ${key}) was not found in the GLB.`);
-      }
-    });
-
     arGroup.add(model);
 
     const box = new THREE.Box3().setFromObject(model);
-    gridHelper.position.y = box.min.y - 0.001;
-    shadowCatcher.position.y = box.min.y - 0.001;
+    floorMesh.position.y = box.min.y;
+    gridHelper.position.y = box.min.y + 0.001;
 
     const center = box.getCenter(new THREE.Vector3());
     controls.target.copy(center);
     controls.update();
   },
-  (xhr) => {
-    if (xhr.total > 0) {
-      console.log(`[MODEL] ${(xhr.loaded / xhr.total * 100).toFixed(0)}% loaded`);
-    }
-  },
+  undefined,
   (error) => {
     console.error('[ERROR] Failed to load GLB model:', error);
   }
