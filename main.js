@@ -53,7 +53,7 @@ const rgbeLoader = new RGBELoader();
 rgbeLoader.load('https://cdn.jsdelivr.net/gh/mrdoob/three.js@dev/examples/textures/equirectangular/venice_sunset_1k.hdr', (texture) => {
   texture.mapping = THREE.EquirectangularReflectionMapping;
   scene.environment = texture;
-  scene.environmentIntensity = 3.5;
+  scene.environmentIntensity = 1;
 });
 
 if (navigator.xr) {
