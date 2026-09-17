@@ -38,7 +38,7 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.35; // Bright tone mapping for crisp metallic sheen
+renderer.toneMappingExposure = 1.6; // Increased exposure to brighten dark areas
 
 renderer.xr.enabled = true;
 container.appendChild(renderer.domElement);
@@ -48,7 +48,7 @@ const rgbeLoader = new RGBELoader();
 rgbeLoader.load('https://threejs.org/examples/textures/equirectangular/royal_esplanade_1k.hdr', (texture) => {
   texture.mapping = THREE.EquirectangularReflectionMapping;
   scene.environment = texture;
-  scene.environmentIntensity = 2.5; // Stronger environment reflection
+  scene.environmentIntensity = 3.0; // High reflection brightness
 });
 
 if (navigator.xr) {
@@ -68,8 +68,8 @@ if (navigator.xr) {
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
-// --- COOL TONE & HIGH CONTRAST LIGHTING SETUP ---
-const keyLight = new THREE.DirectionalLight(0xffffff, 3.2);
+// --- BRIGHTER COOL TONE LIGHTING ---
+const keyLight = new THREE.DirectionalLight(0xffffff, 4.5); // Boosted key light
 keyLight.position.set(4, 6, 4);
 keyLight.castShadow = true;
 keyLight.shadow.bias = -0.0015;
@@ -83,24 +83,25 @@ keyLight.shadow.camera.top = 3;
 keyLight.shadow.camera.bottom = -3;
 scene.add(keyLight);
 
-// Cool blue fill light for subtle metallic tint
-const fillLight = new THREE.DirectionalLight(0xaaccff, 2.5);
+// Cool blue fill light with elevated intensity
+const fillLight = new THREE.DirectionalLight(0xbbe0ff, 3.2);
 fillLight.position.set(-4, 3, -3);
 scene.add(fillLight);
 
-const ambientLight = new THREE.AmbientLight(0xdbeaff, 0.9);
+// Ambient light boosted for shadow clarity
+const ambientLight = new THREE.AmbientLight(0xedf5ff, 1.8);
 scene.add(ambientLight);
 
-// Sky-blue to dark ground hemisphere light
-const hemiLight = new THREE.HemisphereLight(0x87ceeb, 0x333333, 1.2);
+// Hemisphere light lifted for bright sky reflections
+const hemiLight = new THREE.HemisphereLight(0xb0e0e6, 0x555555, 1.6);
 hemiLight.position.set(0, 20, 0);
 scene.add(hemiLight);
 
 const BASE_INTENSITIES = {
-  key: 3.2,
-  fill: 2.5,
-  ambient: 0.9,
-  hemi: 1.2
+  key: 4.5,
+  fill: 3.2,
+  ambient: 1.8,
+  hemi: 1.6
 };
 
 // --- AR GROUP & FLOOR MAT ---
@@ -255,10 +256,9 @@ loader.load(
         child.receiveShadow = true;
 
         if (child.material) {
-          // High metalness and low roughness for polished silver reflections
-          child.material.metalness = 0.95;
-          child.material.roughness = 0.15;
-          child.material.envMapIntensity = 2.5;
+          child.material.metalness = 0.85;
+          child.material.roughness = 0.2;
+          child.material.envMapIntensity = 2.8;
         }
       }
       Object.entries(AXIS_CONFIG).forEach(([key, cfg]) => {
