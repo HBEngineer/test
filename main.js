@@ -28,7 +28,7 @@ window.THREE = THREE;
 scene.background = new THREE.Color(0x2b2b2b);
 
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.set(0, 0.7, 2.5);
+camera.position.set(0.5, 1, 2.5);
 
 // Add Camera to Scene so attached lights track camera movements
 scene.add(camera);
@@ -55,7 +55,7 @@ const rgbeLoader = new RGBELoader();
 rgbeLoader.load('https://cdn.jsdelivr.net/gh/mrdoob/three.js@dev/examples/textures/equirectangular/venice_sunset_1k.hdr', (texture) => {
   texture.mapping = THREE.EquirectangularReflectionMapping;
   scene.environment = texture;
-  scene.environmentIntensity = 1.0; // Lowered default reflection intensity (try values like 0.5 - 1.0)
+  scene.environmentIntensity = 0.5; // Lowered default reflection intensity (try values like 0.5 - 1.0)
 });
 
 if (navigator.xr) {
@@ -76,33 +76,33 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
 // --- DYNAMIC CAMERA LIGHT (Follows Viewpoint) ---
-const cameraLight = new THREE.DirectionalLight(0xffffff, 2.2);
-cameraLight.position.set(0, 0, 1); // Offset slightly forward from camera lens
+const cameraLight = new THREE.DirectionalLight(0xffffff, 2);
+cameraLight.position.set(0, 1, 1); // Offset slightly forward from camera lens
 camera.add(cameraLight);
 
 // --- SCENE LIGHTING SETUP ---
-const keyLight = new THREE.DirectionalLight(0xffffff, 4.0);
+const keyLight = new THREE.DirectionalLight(0xffffff, 1.0);
 keyLight.position.set(4, 6, 4);
 keyLight.castShadow = true;
-keyLight.shadow.bias = -0.0015;
-keyLight.shadow.normalBias = 0.02;
+keyLight.shadow.bias = -0.0005;        // CHANGED: Reduced bias to prevent shadow gap at the base
+keyLight.shadow.normalBias = 0.003;     // CHANGED: Reduced from 0.02 so shadows don't detach or fade at contact points
 keyLight.shadow.mapSize.set(2048, 2048);
 keyLight.shadow.camera.near = 0.5;
-keyLight.shadow.camera.far = 15;
-keyLight.shadow.camera.left = -3;
-keyLight.shadow.camera.right = 3;
-keyLight.shadow.camera.top = 3;
-keyLight.shadow.camera.bottom = -3;
+keyLight.shadow.camera.far = 10;        // CHANGED: Reduced far plane to focus shadow depth
+keyLight.shadow.camera.left = -1.8;     // CHANGED: Tightened shadow bounds around the gantry model size
+keyLight.shadow.camera.right = 1.8;    // CHANGED: Higher resolution shadow detail inside smaller bounds
+keyLight.shadow.camera.top = 1.8;      // CHANGED
+keyLight.shadow.camera.bottom = -1.8;  // CHANGED
 scene.add(keyLight);
 
-const fillLight = new THREE.DirectionalLight(0xbbe0ff, 3.0);
+const fillLight = new THREE.DirectionalLight(0xbbe0ff, 0.5);
 fillLight.position.set(-4, 3, -3);
 scene.add(fillLight);
 
-const ambientLight = new THREE.AmbientLight(0xedf5ff, 1.8);
+const ambientLight = new THREE.AmbientLight(0xedf5ff, 0.5);
 scene.add(ambientLight);
 
-const hemiLight = new THREE.HemisphereLight(0xb0e0e6, 0x555555, 1.6);
+const hemiLight = new THREE.HemisphereLight(0xb0e0e6, 0x555555, 1);
 hemiLight.position.set(0, 20, 0);
 scene.add(hemiLight);
 
@@ -237,7 +237,7 @@ if (ctrlAngle) {
 // ==========================================
 const AXIS_CONFIG = {
   PosX: { nodeName: 'Slide_X', axis: 'z', valueElementId: 'val-x', sign: 1 },
-  PosY: { nodeName: 'Slide_Y', axis: 'x', valueElementId: 'val-y', sign: -1 },
+  PosY: { nodeName: 'Slide_Y', axis: 'z', valueElementId: 'val-y', sign: 1 },
   PosZ: { nodeName: 'Slide_Z', axis: 'y', valueElementId: 'val-z', sign: -1 }
 };
 
@@ -268,8 +268,8 @@ loader.load(
 
         if (child.material) {
           // Polished metallic finish
-          child.material.metalness = 0.90;
-          child.material.roughness = 0.18;
+          //child.material.metalness = 0.90;
+          //child.material.roughness = 0.18;
           child.material.envMapIntensity = 1.0; // Lowered from 3.5 to match environment settings
         }
       }

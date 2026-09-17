@@ -21,6 +21,14 @@
   </script>
 
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+
+  <!-- iPhone AR (8th Wall) - separate classic/global THREE instance, since
+       8th Wall's Threejs integration expects window.THREE, not an ES
+       module. Isolated from the ES-module THREE used everywhere else. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="./gltfloader-classic.js" onerror="window.__gltfScriptFailed = true" onload="window.__gltfScriptLoaded = true"></script>
+  <script>window.__CAPTURED_THREE__ = window.THREE; window.__CAPTURED_GLTFLOADER__ = window.THREE && window.THREE.GLTFLoader;</script>
+  <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
 </head>
 <body>
 
@@ -67,6 +75,24 @@
     <span id="ar-scan-text">Scan surface...</span>
   </div>
 
+  <!-- iOS Live AR Button (8th Wall) -->
+  <button id="ios-live-ar-btn" class="ios-ar-button" style="display:none;">Start Live AR (Beta)</button>
+
+  <!-- iPhone Live AR (8th Wall) - camera feed + UI, hidden until started -->
+  <canvas id="camerafeed" style="display: none;"></canvas>
+  <div id="ios-ar-scan-overlay" class="ar-scan-overlay">
+    <div class="ar-scan-card">
+      <div id="ios-ar-scan-text">Starting AR...</div>
+    </div>
+  </div>
+  <button id="ios-ar-exit-btn" class="ios-ar-exit-button" style="display: none;">Exit AR</button>
+
+  <script>
+    const __isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    if (__isIOS) document.getElementById('ios-live-ar-btn').style.display = 'flex';
+  </script>
+
   <script type="module" src="./main.js"></script>
+  <script src="./ar-iphone.js" defer></script>
 </body>
 </html>

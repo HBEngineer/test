@@ -1,4 +1,4 @@
-* {
+* * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -162,4 +162,67 @@ body {
 
 #ar-scan-overlay.visible {
   display: block;
+}
+/* iPhone Live AR (8th Wall) - additive, does not modify existing rules */
+.ios-ar-button {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 999;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 20px;
+  background: rgba(0, 145, 255, 0.9);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  display: none;
+}
+
+#camerafeed {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  touch-action: none;
+  z-index: 2000;
+}
+
+.ar-scan-overlay {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  right: 20px;
+  z-index: 2001;
+  display: none;
+  justify-content: center;
+}
+.ar-scan-overlay.visible { display: flex; }
+.ar-scan-card {
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  text-align: center;
+}
+
+.ios-ar-exit-button {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 2002;
+  padding: 10px 18px;
+  border: none;
+  border-radius: 20px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
 }

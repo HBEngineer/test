@@ -1,4 +1,4 @@
-// ==========================================
+/// ==========================================
 // iPhone Live AR (8th Wall)
 // ==========================================
 // This is a classic (non-module) script, not an ES module like main.js -
@@ -94,7 +94,7 @@
 
   // --- Hide/show the rest of the app's UI while in live AR, so nothing
   // overlaps the full-screen camera feed ---
-  const appUiIds = ['status-card', 'light-panel', 'canvas-container', 'ios-ar-btn', 'ios-live-ar-btn'];
+  const appUiIds = ['status-panel', 'light-panel', 'canvas-container', 'ios-ar-btn', 'ios-live-ar-btn'];
   const savedDisplayValues = {}; // captures each element's actual display value before hiding, so it can be restored exactly (setting style.display = '' falls back to the stylesheet default, which is 'none' for the AR buttons - that was the bug)
   const setAppUiVisible = (visible) => {
     appUiIds.forEach((id) => {
