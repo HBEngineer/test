@@ -79,6 +79,15 @@ keyLight.castShadow = true;
 keyLight.shadow.bias = -0.0015;
 keyLight.shadow.normalBias = 0.02;
 keyLight.shadow.mapSize.set(2048, 2048);
+
+// Expand shadow camera frustum so full model casts shadows
+keyLight.shadow.camera.near = 0.5;
+keyLight.shadow.camera.far = 15;
+keyLight.shadow.camera.left = -3;
+keyLight.shadow.camera.right = 3;
+keyLight.shadow.camera.top = 3;
+keyLight.shadow.camera.bottom = -3;
+
 scene.add(keyLight);
 
 const fillLight = new THREE.DirectionalLight(0xffffff, 2.0);
@@ -104,7 +113,7 @@ gridHelper.position.y = -0.01;
 
 const shadowCatcher = new THREE.Mesh(
   new THREE.PlaneGeometry(40, 40),
-  new THREE.ShadowMaterial({ opacity: 0.15 })
+  new THREE.ShadowMaterial({ opacity: 0.2 })
 );
 shadowCatcher.rotation.x = -Math.PI / 2;
 shadowCatcher.receiveShadow = true;
@@ -179,6 +188,7 @@ panelHeader.addEventListener('click', () => {
 
 const LIGHTING_STORAGE_KEY = 'gantryDigitalTwin.lightingDefaults';
 
+// Updated Factory Defaults matching current active setup
 const FACTORY_LIGHTING_CONFIG = {
   hemi: { intensity: 0.7, position: { x: 20, y: 20, z: 20 } },
   key: { intensity: 2.0, color: '#ffffff', position: { x: 4, y: 6, z: 4 } },
