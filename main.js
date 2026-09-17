@@ -25,7 +25,7 @@ const scene = new THREE.Scene();
 window.scene = scene;
 window.THREE = THREE;
 
-// Dark background matching reference image
+// Dark studio background matching reference image
 scene.background = new THREE.Color(0x2b2b2b);
 
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -39,16 +39,17 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0;
+renderer.toneMappingExposure = 1.2; // Boosted overall exposure for vibrant metallic sheen
 
 renderer.xr.enabled = true;
 container.appendChild(renderer.domElement);
 
-// --- ENVIRONMENT MAP ---
+// --- ENVIRONMENT MAP (Metallic Reflections) ---
 const rgbeLoader = new RGBELoader();
 rgbeLoader.load('https://threejs.org/examples/textures/equirectangular/royal_esplanade_1k.hdr', (texture) => {
   texture.mapping = THREE.EquirectangularReflectionMapping;
   scene.environment = texture;
+  scene.environmentIntensity = 1.5; // Boost environment reflections
 });
 
 if (navigator.xr) {
@@ -68,8 +69,8 @@ if (navigator.xr) {
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
-// --- LIGHTING SETUP ---
-const keyLight = new THREE.DirectionalLight(0xffffff, 2.0);
+// --- REBALANCED LIGHTING SETUP ---
+const keyLight = new THREE.DirectionalLight(0xffffff, 3.5); // High key light for sharp highlights
 keyLight.position.set(4, 6, 4);
 keyLight.castShadow = true;
 keyLight.shadow.bias = -0.0015;
@@ -83,25 +84,31 @@ keyLight.shadow.camera.top = 3;
 keyLight.shadow.camera.bottom = -3;
 scene.add(keyLight);
 
-const fillLight = new THREE.DirectionalLight(0xffffff, 1.2);
+const fillLight = new THREE.DirectionalLight(0xe0f0ff, 2.0); // Soft cool fill light
 fillLight.position.set(-4, 3, -3);
 scene.add(fillLight);
 
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+const ambientLight = new THREE.AmbientLight(0xffffff, 1.2); // Base ambient light to lift shadows
 scene.add(ambientLight);
+
+// Hemisphere light to add clean overhead illumination
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0);
+hemiLight.position.set(0, 20, 0);
+scene.add(hemiLight);
 
 // Base intensity multipliers for master brightness scaling
 const BASE_INTENSITIES = {
-  key: 2.0,
-  fill: 1.2,
-  ambient: 0.8
+  key: 3.5,
+  fill: 2.0,
+  ambient: 1.2,
+  hemi: 1.0
 };
 
 // --- AR GROUP & FLOOR MAT ---
 const arGroup = new THREE.Group();
 scene.add(arGroup);
 
-// Clear light floor mesh matching reference picture
+// Clear light floor mesh
 const floorGeo = new THREE.PlaneGeometry(10, 10);
 const floorMat = new THREE.MeshStandardMaterial({
   color: 0xdcdcdc,
@@ -113,9 +120,9 @@ floorMesh.rotation.x = -Math.PI / 2;
 floorMesh.receiveShadow = true;
 arGroup.add(floorMesh);
 
-// Light grid overlay over floor plane
+// Light grid overlay
 const gridHelper = new THREE.GridHelper(10, 10, 0xbbbbbb, 0xcccccc);
-gridHelper.position.y = 0.001; // Slightly above floor mesh to prevent z-fighting
+gridHelper.position.y = 0.001;
 arGroup.add(gridHelper);
 
 // WebXR Session handlers
@@ -188,7 +195,7 @@ if (panelHeader && lightPanel) {
   });
 }
 
-// Master Brightness Control (0.1 to 2.0x multiplier)
+// Master Brightness Control
 const ctrlBrightness = document.getElementById('ctrl-brightness');
 const lblBrightness = document.getElementById('lbl-brightness');
 
@@ -198,14 +205,15 @@ if (ctrlBrightness) {
     keyLight.intensity = BASE_INTENSITIES.key * scale;
     fillLight.intensity = BASE_INTENSITIES.fill * scale;
     ambientLight.intensity = BASE_INTENSITIES.ambient * scale;
+    hemiLight.intensity = BASE_INTENSITIES.hemi * scale;
     if (lblBrightness) lblBrightness.innerText = `${Math.round(scale * 100)}%`;
   });
 }
 
-// Light Angle Control (Rotate key light position around Y axis in degrees)
+// Light Angle Control
 const ctrlAngle = document.getElementById('ctrl-angle');
 const lblAngle = document.getElementById('lbl-angle');
-const LIGHT_RADIUS = 7.2; // Original light radial distance
+const LIGHT_RADIUS = 7.2;
 
 if (ctrlAngle) {
   ctrlAngle.addEventListener('input', (e) => {
@@ -252,9 +260,9 @@ loader.load(
         child.receiveShadow = true;
 
         if (child.material) {
-          child.material.metalness = 0.85;
-          child.material.roughness = 0.25;
-          child.material.envMapIntensity = 1.2;
+          child.material.metalness = 0.75;
+          child.material.roughness = 0.3;
+          child.material.envMapIntensity = 1.5;
         }
       }
       Object.entries(AXIS_CONFIG).forEach(([key, cfg]) => {
