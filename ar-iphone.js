@@ -84,7 +84,7 @@
   const startResizeSafetyNet = () => {
     const start = Date.now();
     resizeSafetyNetInterval = setInterval(() => {
-      resizeCanvasToWindow();
+      // DISABLED for testing - resizeCanvasToWindow();
       if (Date.now() - start > 5000) {
         clearInterval(resizeSafetyNetInterval);
         resizeSafetyNetInterval = null;
@@ -121,7 +121,7 @@
 
       onStart: ({ canvas: pipelineCanvas }) => {
         try {
-          resizeCanvasToWindow();
+          // DISABLED for testing - resizeCanvasToWindow();
 
           const cfg = window.GANTRY_CONFIG;
           if (!cfg) {
@@ -196,7 +196,7 @@
               });
 
               arGroup.add(model);
-              nudge8thWallResize(); // model just became visible-capable - sync 8th Wall's internal camera now, not on a fixed timer unrelated to load time
+              // DISABLED for testing - nudge8thWallResize(); // model just became visible-capable - sync 8th Wall's internal camera now, not on a fixed timer unrelated to load time
               setOverlayText('Move your phone to find a surface, then tap it.');
             },
             (xhr) => {
@@ -231,7 +231,7 @@
               arGroup.position.set(position.x, position.y, position.z);
               arGroup.quaternion.identity(); // a single FEATURE_POINT hit's rotation isn't reliably clean and was causing the model to render skewed/deformed on placement
               arGroup.visible = true;
-              nudge8thWallResize(); // sync again right at the moment of first placement
+              // DISABLED for testing - nudge8thWallResize(); // sync again right at the moment of first placement
               placed = true;
               hideOverlay();
             }
