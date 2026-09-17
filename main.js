@@ -48,12 +48,12 @@ renderer.xr.enabled = true;
 container.appendChild(renderer.domElement);
 
 // --- ENVIRONMENT MAP (High Intensity Reflections) ---
-// UPDATED: Replaced 404 URL with raw github CDN link for royal_esplanade_1k.hdr
+
 const rgbeLoader = new RGBELoader();
-rgbeLoader.load('https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/equirectangular/royal_esplanade_1k.hdr', (texture) => {
+rgbeLoader.load('https://cdn.jsdelivr.net/gh/mrdoob/three.js@dev/examples/textures/equirectangular/venice_sunset_1k.hdr', (texture) => {
   texture.mapping = THREE.EquirectangularReflectionMapping;
   scene.environment = texture;
-  scene.environmentIntensity = 3.5; // Lifted reflection strength for intense metallic shine
+  scene.environmentIntensity = 3.5;
 });
 
 if (navigator.xr) {
