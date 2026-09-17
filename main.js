@@ -2,10 +2,11 @@
 // 0. MODULE IMPORTS
 // ==========================================
 import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 
-window.THREE = THREE; // Expose globally for 8th Wall Three.js pipeline module
+window.THREE = THREE;
 
 // ==========================================
 // 1. HIVEMQ CLOUD CREDENTIALS
@@ -20,9 +21,9 @@ const MQTT_TOPIC = "festo/hgosydney/positions";
 // 2. CONFIG & GANTRY STATE
 // ==========================================
 const AXIS_CONFIG = {
-  PosX: { nodeName: 'Slide_X', axis: 'z', sign: 1 },
-  PosY: { nodeName: 'Slide_Y', axis: 'x', sign: -1 },
-  PosZ: { nodeName: 'Slide_Z', axis: 'y', sign: -1 }
+  PosX: { nodeName: 'Slide_X', axis: 'z', valueElementId: 'val-x', sign: 1 },
+  PosY: { nodeName: 'Slide_Y', axis: 'x', valueElementId: 'val-y', sign: -1 },
+  PosZ: { nodeName: 'Slide_Z', axis: 'y', valueElementId: 'val-z', sign: -1 }
 };
 
 const axisState = {};
@@ -30,141 +31,166 @@ const SCALE_FACTOR = 0.001;
 const LERP_FACTOR = 0.05;
 const MODEL_URL = './model/hgosydney_Kinetic.glb';
 
-let arGroup = new THREE.Group();
-let modelPlaced = false;
-
 // ==========================================
-// 3. 8TH WALL PIPELINE MODULE
+// 3. THREE.JS SCENE SETUP (v1.0 Baseline)
 // ==========================================
-const initXREngine = () => {
-  return {
-    name: 'gantry-ar-pipeline',
+const container = document.getElementById('canvas-container');
 
-    onStart: ({ canvas }) => {
-      const { scene, camera, renderer } = XR8.Threejs.xrScene();
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x2b2b2b);
 
-      // Color & Exposure Settings (v1.0 Baseline)
-      renderer.outputEncoding = THREE.sRGBEncoding;
-      renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 1.65;
-      renderer.shadowMap.enabled = true;
-      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+camera.position.set(0, 0.7, 2.5);
+scene.add(camera);
 
-      // Dynamic Camera Light (Attached to Camera)
-      const cameraLight = new THREE.DirectionalLight(0xffffff, 2.2);
-      cameraLight.position.set(0, 0, 1);
-      camera.add(cameraLight);
-      scene.add(camera);
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-      // Environment Reflection Map
-      const rgbeLoader = new RGBELoader();
-      rgbeLoader.load('https://threejs.org/examples/textures/equirectangular/royal_esplanade_1k.hdr', (texture) => {
-        texture.mapping = THREE.EquirectangularReflectionMapping;
-        scene.environment = texture;
-        scene.environmentIntensity = 3.5;
-      });
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.65;
+container.appendChild(renderer.domElement);
 
-      // Key, Fill, Ambient & Hemisphere Studio Lights
-      const keyLight = new THREE.DirectionalLight(0xffffff, 4.0);
-      keyLight.position.set(4, 6, 4);
-      keyLight.castShadow = true;
-      scene.add(keyLight);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
 
-      const fillLight = new THREE.DirectionalLight(0xbbe0ff, 3.0);
-      fillLight.position.set(-4, 3, -3);
-      scene.add(fillLight);
+// Environment Map
+const rgbeLoader = new RGBELoader();
+rgbeLoader.load('https://threejs.org/examples/textures/equirectangular/royal_esplanade_1k.hdr', (texture) => {
+  texture.mapping = THREE.EquirectangularReflectionMapping;
+  scene.environment = texture;
+  scene.environmentIntensity = 3.5;
+});
 
-      const ambientLight = new THREE.AmbientLight(0xedf5ff, 1.8);
-      scene.add(ambientLight);
+// Camera Light & Scene Lighting
+const cameraLight = new THREE.DirectionalLight(0xffffff, 2.2);
+cameraLight.position.set(0, 0, 1);
+camera.add(cameraLight);
 
-      const hemiLight = new THREE.HemisphereLight(0xb0e0e6, 0x555555, 1.6);
-      hemiLight.position.set(0, 20, 0);
-      scene.add(hemiLight);
+const keyLight = new THREE.DirectionalLight(0xffffff, 4.0);
+keyLight.position.set(4, 6, 4);
+keyLight.castShadow = true;
+scene.add(keyLight);
 
-      // Add AR Group to Scene
-      scene.add(arGroup);
-      arGroup.visible = false;
+const fillLight = new THREE.DirectionalLight(0xbbe0ff, 3.0);
+fillLight.position.set(-4, 3, -3);
+scene.add(fillLight);
 
-      // Load Gantry GLB Model
-      const loader = new GLTFLoader();
-      loader.load(
-        MODEL_URL,
-        (gltf) => {
-          console.log('[MODEL] Loaded successfully!');
-          const model = gltf.scene;
+const ambientLight = new THREE.AmbientLight(0xedf5ff, 1.8);
+scene.add(ambientLight);
 
-          model.traverse((child) => {
-            if (child.isMesh) {
-              child.castShadow = true;
-              child.receiveShadow = true;
-              if (child.material) {
-                child.material.metalness = 0.90;
-                child.material.roughness = 0.18;
-                child.material.envMapIntensity = 3.5;
-              }
-            }
+const hemiLight = new THREE.HemisphereLight(0xb0e0e6, 0x555555, 1.6);
+hemiLight.position.set(0, 20, 0);
+scene.add(hemiLight);
 
-            Object.entries(AXIS_CONFIG).forEach(([key, cfg]) => {
-              if (child.name === cfg.nodeName) {
-                axisState[key] = {
-                  node: child,
-                  axis: cfg.axis,
-                  sign: cfg.sign,
-                  initial: child.position[cfg.axis],
-                  target: 0
-                };
-              }
-            });
-          });
+const BASE_INTENSITIES = { key: 4.0, fill: 3.0, ambient: 1.8, hemi: 1.6, camera: 2.2 };
 
-          arGroup.add(model);
-        },
-        undefined,
-        (err) => console.error('[ERROR] GLB load error:', err)
-      );
+// Model Container Group
+const arGroup = new THREE.Group();
+scene.add(arGroup);
 
-      // Tap-to-Place Model in World Space
-      canvas.addEventListener('click', () => {
-        if (!modelPlaced) {
-          const { camera } = XR8.Threejs.xrScene();
-          
-          // Place 1.5m in front of the camera looking slightly down
-          const forward = new THREE.Vector3(0, -0.2, -1.5).applyQuaternion(camera.quaternion);
-          arGroup.position.copy(camera.position).add(forward);
-          arGroup.rotation.y = camera.rotation.y;
-          
-          arGroup.visible = true;
-          modelPlaced = true;
-
-          const instruction = document.getElementById('ar-instruction');
-          if (instruction) instruction.innerText = 'Gantry Placed';
-        }
-      });
-    },
-
-    // Smooth Lerp Animation Engine Frame Callback
-    onUpdate: () => {
-      Object.values(axisState).forEach(({ node, axis, sign, initial, target }) => {
-        const targetValue = initial + (target * SCALE_FACTOR * sign);
-        node.position[axis] += (targetValue - node.position[axis]) * LERP_FACTOR;
-      });
+// Load GLB Model
+const loader = new GLTFLoader();
+loader.load(MODEL_URL, (gltf) => {
+  const model = gltf.scene;
+  model.traverse((child) => {
+    if (child.isMesh) {
+      child.castShadow = true;
+      child.receiveShadow = true;
+      if (child.material) {
+        child.material.metalness = 0.90;
+        child.material.roughness = 0.18;
+        child.material.envMapIntensity = 3.5;
+      }
     }
-  };
-};
+    Object.entries(AXIS_CONFIG).forEach(([key, cfg]) => {
+      if (child.name === cfg.nodeName) {
+        axisState[key] = {
+          node: child,
+          axis: cfg.axis,
+          sign: cfg.sign,
+          initial: child.position[cfg.axis],
+          target: 0
+        };
+      }
+    });
+  });
+  arGroup.add(model);
+});
 
 // ==========================================
-// 4. HIVEMQ CLOUD CONNECTION
+// 4. RESTORED LIGHTING CONTROLS UI
+// ==========================================
+const lightPanel = document.getElementById('light-panel');
+const panelHeader = document.getElementById('light-panel-header');
+if (panelHeader && lightPanel) {
+  panelHeader.addEventListener('click', () => lightPanel.classList.toggle('collapsed'));
+}
+
+const ctrlBrightness = document.getElementById('ctrl-brightness');
+const lblBrightness = document.getElementById('lbl-brightness');
+if (ctrlBrightness) {
+  ctrlBrightness.addEventListener('input', (e) => {
+    const scale = parseFloat(e.target.value);
+    keyLight.intensity = BASE_INTENSITIES.key * scale;
+    fillLight.intensity = BASE_INTENSITIES.fill * scale;
+    ambientLight.intensity = BASE_INTENSITIES.ambient * scale;
+    hemiLight.intensity = BASE_INTENSITIES.hemi * scale;
+    cameraLight.intensity = BASE_INTENSITIES.camera * scale;
+    if (lblBrightness) lblBrightness.innerText = `${Math.round(scale * 100)}%`;
+  });
+}
+
+const ctrlAngle = document.getElementById('ctrl-angle');
+const lblAngle = document.getElementById('lbl-angle');
+const LIGHT_RADIUS = 7.2;
+if (ctrlAngle) {
+  ctrlAngle.addEventListener('input', (e) => {
+    const deg = parseFloat(e.target.value);
+    const rad = (deg * Math.PI) / 180;
+    keyLight.position.x = Math.cos(rad) * LIGHT_RADIUS;
+    keyLight.position.z = Math.sin(rad) * LIGHT_RADIUS;
+    if (lblAngle) lblAngle.innerText = `${Math.round(deg)}°`;
+  });
+}
+
+// ==========================================
+// 5. ANIMATION LOOP & 8TH WALL FALLBACK
+// ==========================================
+function animate() {
+  Object.values(axisState).forEach(({ node, axis, sign, initial, target }) => {
+    const targetValue = initial + (target * SCALE_FACTOR * sign);
+    node.position[axis] += (targetValue - node.position[axis]) * LERP_FACTOR;
+  });
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+// Standard WebGL Render Loop (ensures model shows even if 8th Wall camera fails)
+renderer.setAnimationLoop(animate);
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ==========================================
+// 6. HIVEMQ CLOUD CONNECTION
 // ==========================================
 const brokerUrl = `wss://${HIVEMQ_HOST}:${HIVEMQ_PORT}/mqtt`;
 const client = mqtt.connect(brokerUrl, {
-  clientId: 'gantry_web_twin_8w_' + Math.random().toString(16).substring(2, 10),
+  clientId: 'gantry_web_twin_' + Math.random().toString(16).substring(2, 10),
   username: HIVEMQ_USERNAME,
   password: HIVEMQ_PASSWORD,
   clean: true
 });
 
 client.on('connect', () => {
-  console.log('[MQTT] Connected to HiveMQ Cloud');
   const statusElem = document.getElementById('status');
   const dotElem = document.getElementById('dot');
 
@@ -188,23 +214,4 @@ client.on('message', (topic, message) => {
   } catch (err) {
     console.error('[MQTT] Parse error:', err);
   }
-});
-
-// ==========================================
-// 5. INITIALIZE 8TH WALL ENGINE
-// ==========================================
-window.addEventListener('load', () => {
-  const container = document.getElementById('canvas-container');
-  const canvas = document.createElement('canvas');
-  container.appendChild(canvas);
-
-  XR8.addCameraPipelineModules([
-    XR8.GlTextureRenderer.pipelineModule(),
-    XR8.Threejs.pipelineModule(),
-    XR8.XrController.pipelineModule(),
-    XR8.CameraPixelArray.pipelineModule(),
-    initXREngine()
-  ]);
-
-  XR8.run({ canvas });
 });
