@@ -38,17 +38,17 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.6; // Higher exposure so silver metal shines bright
+renderer.toneMappingExposure = 1.0; // Standard balanced exposure
 
 renderer.xr.enabled = true;
 container.appendChild(renderer.domElement);
 
-// --- ENVIRONMENT MAP (Bright metallic reflections) ---
+// --- ENVIRONMENT MAP (Balanced Reflections) ---
 const rgbeLoader = new RGBELoader();
 rgbeLoader.load('https://threejs.org/examples/textures/equirectangular/royal_esplanade_1k.hdr', (texture) => {
   texture.mapping = THREE.EquirectangularReflectionMapping;
   scene.environment = texture;
-  scene.environmentIntensity = 3.5; // Boosted reflections to bring back silver finish
+  scene.environmentIntensity = 1.2; // Controlled reflection intensity
 });
 
 if (navigator.xr) {
@@ -68,8 +68,8 @@ if (navigator.xr) {
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
-// --- BRIGHT BALANCED LIGHTING ---
-const keyLight = new THREE.DirectionalLight(0xffffff, 4.0);
+// --- BALANCED STUDIO LIGHTING ---
+const keyLight = new THREE.DirectionalLight(0xffffff, 2.2);
 keyLight.position.set(4, 6, 4);
 keyLight.castShadow = true;
 keyLight.shadow.bias = -0.0015;
@@ -83,22 +83,22 @@ keyLight.shadow.camera.top = 3;
 keyLight.shadow.camera.bottom = -3;
 scene.add(keyLight);
 
-const fillLight = new THREE.DirectionalLight(0xffffff, 2.5);
+const fillLight = new THREE.DirectionalLight(0xdbeaff, 1.2);
 fillLight.position.set(-4, 3, -3);
 scene.add(fillLight);
 
-const ambientLight = new THREE.AmbientLight(0xffffff, 1.8);
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
 scene.add(ambientLight);
 
-const hemiLight = new THREE.HemisphereLight(0xffffff, 0x666666, 1.5);
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
 hemiLight.position.set(0, 20, 0);
 scene.add(hemiLight);
 
 const BASE_INTENSITIES = {
-  key: 4.0,
-  fill: 2.5,
-  ambient: 1.8,
-  hemi: 1.5
+  key: 2.2,
+  fill: 1.2,
+  ambient: 0.8,
+  hemi: 0.6
 };
 
 // --- AR GROUP & FLOOR MAT ---
@@ -179,7 +179,7 @@ controller.addEventListener('select', () => {
 scene.add(controller);
 
 // ==========================================
-// 3. SIMPLIFIED USER LIGHT CONTROLS
+// 3. USER LIGHT CONTROLS
 // ==========================================
 const lightPanel = document.getElementById('light-panel');
 const panelHeader = document.getElementById('light-panel-header');
@@ -253,10 +253,10 @@ loader.load(
         child.receiveShadow = true;
 
         if (child.material) {
-          // Rebalanced parameters for realistic silver metallic extrusions
-          child.material.metalness = 0.6;
-          child.material.roughness = 0.25;
-          child.material.envMapIntensity = 3.0;
+          // Optimized for satin aluminum finish
+          child.material.metalness = 0.85;
+          child.material.roughness = 0.35;
+          child.material.envMapIntensity = 1.2;
         }
       }
       Object.entries(AXIS_CONFIG).forEach(([key, cfg]) => {
