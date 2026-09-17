@@ -38,17 +38,17 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0; // Standard balanced exposure
+renderer.toneMappingExposure = 1.25; // Slightly elevated exposure for clearer visibility
 
 renderer.xr.enabled = true;
 container.appendChild(renderer.domElement);
 
-// --- ENVIRONMENT MAP (Balanced Reflections) ---
+// --- ENVIRONMENT MAP ---
 const rgbeLoader = new RGBELoader();
 rgbeLoader.load('https://threejs.org/examples/textures/equirectangular/royal_esplanade_1k.hdr', (texture) => {
   texture.mapping = THREE.EquirectangularReflectionMapping;
   scene.environment = texture;
-  scene.environmentIntensity = 1.2; // Controlled reflection intensity
+  scene.environmentIntensity = 1.8; // Increased reflection brightness
 });
 
 if (navigator.xr) {
@@ -68,8 +68,8 @@ if (navigator.xr) {
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
-// --- BALANCED STUDIO LIGHTING ---
-const keyLight = new THREE.DirectionalLight(0xffffff, 2.2);
+// --- RECALIBRATED BRIGHT LIGHTING ---
+const keyLight = new THREE.DirectionalLight(0xffffff, 3.0);
 keyLight.position.set(4, 6, 4);
 keyLight.castShadow = true;
 keyLight.shadow.bias = -0.0015;
@@ -83,22 +83,22 @@ keyLight.shadow.camera.top = 3;
 keyLight.shadow.camera.bottom = -3;
 scene.add(keyLight);
 
-const fillLight = new THREE.DirectionalLight(0xdbeaff, 1.2);
+const fillLight = new THREE.DirectionalLight(0xe0f0ff, 1.8);
 fillLight.position.set(-4, 3, -3);
 scene.add(fillLight);
 
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
 scene.add(ambientLight);
 
-const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0x555555, 0.9);
 hemiLight.position.set(0, 20, 0);
 scene.add(hemiLight);
 
 const BASE_INTENSITIES = {
-  key: 2.2,
-  fill: 1.2,
-  ambient: 0.8,
-  hemi: 0.6
+  key: 3.0,
+  fill: 1.8,
+  ambient: 1.2,
+  hemi: 0.9
 };
 
 // --- AR GROUP & FLOOR MAT ---
@@ -253,10 +253,9 @@ loader.load(
         child.receiveShadow = true;
 
         if (child.material) {
-          // Optimized for satin aluminum finish
-          child.material.metalness = 0.85;
-          child.material.roughness = 0.35;
-          child.material.envMapIntensity = 1.2;
+          child.material.metalness = 0.75;
+          child.material.roughness = 0.3;
+          child.material.envMapIntensity = 1.8;
         }
       }
       Object.entries(AXIS_CONFIG).forEach(([key, cfg]) => {
