@@ -1,4 +1,4 @@
-/// ==========================================
+// ==========================================
 // iPhone Live AR (8th Wall)
 // ==========================================
 // This is a classic (non-module) script, not an ES module like main.js -
@@ -202,7 +202,7 @@
             (xhr) => {
               lastProgressAt = Date.now();
               if (xhr.lengthComputable) {
-                const pct = Math.round((xhr.loaded / xhr.total) * 100);
+                const pct = Math.min(100, Math.round((xhr.loaded / xhr.total) * 100));
                 const mb = (xhr.total / 1024 / 1024).toFixed(1);
                 setOverlayText(`Loading gantry model... ${pct}% (${mb}MB total)`);
                 console.log(`[AR] Model load progress: ${pct}% (${xhr.loaded}/${xhr.total} bytes)`);
