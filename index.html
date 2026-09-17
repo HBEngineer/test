@@ -31,7 +31,7 @@
       z-index: 1;
     }
 
-    /* --- OVERLAY UI PANELS --- */
+    /* Overlay Panels */
     .panel {
       position: absolute;
       z-index: 10;
@@ -43,7 +43,6 @@
       box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
     }
 
-    /* MQTT Status Panel (Top Left) */
     #status-panel {
       top: 20px;
       left: 20px;
@@ -88,7 +87,7 @@
       font-weight: bold;
     }
 
-    /* Simplified Light Panel (Top Right) */
+    /* Lighting Control Panel - Collapsed by default */
     #light-panel {
       top: 20px;
       right: 20px;
@@ -108,14 +107,15 @@
       align-items: center;
     }
 
+    /* Clear collapse arrows using standard unicode */
     .panel-header::after {
       content: '?';
-      font-size: 10px;
-      transition: transform 0.3s;
+      font-size: 11px;
+      transition: transform 0.2s ease;
     }
 
     #light-panel.collapsed .panel-header::after {
-      transform: rotate(180deg);
+      content: '?';
     }
 
     #light-panel.collapsed .panel-body {
@@ -148,7 +148,6 @@
       cursor: pointer;
     }
 
-    /* AR Scanning Prompt Overlay */
     #ar-scan-overlay {
       position: absolute;
       top: 50%;
@@ -171,7 +170,6 @@
     }
   </style>
 
-  <!-- Import Map for Three.js ES Modules -->
   <script type="importmap">
     {
       "imports": {
@@ -181,14 +179,12 @@
     }
   </script>
 
-  <!-- MQTT Client Library -->
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 </head>
 <body>
 
   <div id="canvas-container"></div>
 
-  <!-- Telemetry Overlay -->
   <div id="status-panel" class="panel">
     <div class="status-header">
       <div id="dot" class="dot"></div>
@@ -208,8 +204,8 @@
     </div>
   </div>
 
-  <!-- Simplified Lighting Controls -->
-  <div id="light-panel" class="panel">
+  <!-- Lighting panel set to collapsed by default -->
+  <div id="light-panel" class="panel collapsed">
     <div id="light-panel-header" class="panel-header">Lighting</div>
     <div class="panel-body">
       <div class="control-group">
@@ -223,12 +219,10 @@
     </div>
   </div>
 
-  <!-- AR Instruction Overlay -->
   <div id="ar-scan-overlay">
     <span id="ar-scan-text">Scan surface...</span>
   </div>
 
-  <!-- Application Entry Point -->
   <script type="module" src="./main.js"></script>
 </body>
 </html>

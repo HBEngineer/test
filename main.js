@@ -39,7 +39,7 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.2; // Boosted overall exposure for vibrant metallic sheen
+renderer.toneMappingExposure = 1.35; // Increased exposure for shiny highlights
 
 renderer.xr.enabled = true;
 container.appendChild(renderer.domElement);
@@ -49,7 +49,7 @@ const rgbeLoader = new RGBELoader();
 rgbeLoader.load('https://threejs.org/examples/textures/equirectangular/royal_esplanade_1k.hdr', (texture) => {
   texture.mapping = THREE.EquirectangularReflectionMapping;
   scene.environment = texture;
-  scene.environmentIntensity = 1.5; // Boost environment reflections
+  scene.environmentIntensity = 2.5; // High reflection intensity
 });
 
 if (navigator.xr) {
@@ -70,7 +70,7 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
 // --- REBALANCED LIGHTING SETUP ---
-const keyLight = new THREE.DirectionalLight(0xffffff, 3.5); // High key light for sharp highlights
+const keyLight = new THREE.DirectionalLight(0xffffff, 3.5);
 keyLight.position.set(4, 6, 4);
 keyLight.castShadow = true;
 keyLight.shadow.bias = -0.0015;
@@ -84,19 +84,17 @@ keyLight.shadow.camera.top = 3;
 keyLight.shadow.camera.bottom = -3;
 scene.add(keyLight);
 
-const fillLight = new THREE.DirectionalLight(0xe0f0ff, 2.0); // Soft cool fill light
+const fillLight = new THREE.DirectionalLight(0xe0f0ff, 2.0);
 fillLight.position.set(-4, 3, -3);
 scene.add(fillLight);
 
-const ambientLight = new THREE.AmbientLight(0xffffff, 1.2); // Base ambient light to lift shadows
+const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
 scene.add(ambientLight);
 
-// Hemisphere light to add clean overhead illumination
 const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0);
 hemiLight.position.set(0, 20, 0);
 scene.add(hemiLight);
 
-// Base intensity multipliers for master brightness scaling
 const BASE_INTENSITIES = {
   key: 3.5,
   fill: 2.0,
@@ -108,7 +106,6 @@ const BASE_INTENSITIES = {
 const arGroup = new THREE.Group();
 scene.add(arGroup);
 
-// Clear light floor mesh
 const floorGeo = new THREE.PlaneGeometry(10, 10);
 const floorMat = new THREE.MeshStandardMaterial({
   color: 0xdcdcdc,
@@ -120,7 +117,6 @@ floorMesh.rotation.x = -Math.PI / 2;
 floorMesh.receiveShadow = true;
 arGroup.add(floorMesh);
 
-// Light grid overlay
 const gridHelper = new THREE.GridHelper(10, 10, 0xbbbbbb, 0xcccccc);
 gridHelper.position.y = 0.001;
 arGroup.add(gridHelper);
@@ -195,7 +191,6 @@ if (panelHeader && lightPanel) {
   });
 }
 
-// Master Brightness Control
 const ctrlBrightness = document.getElementById('ctrl-brightness');
 const lblBrightness = document.getElementById('lbl-brightness');
 
@@ -210,7 +205,6 @@ if (ctrlBrightness) {
   });
 }
 
-// Light Angle Control
 const ctrlAngle = document.getElementById('ctrl-angle');
 const lblAngle = document.getElementById('lbl-angle');
 const LIGHT_RADIUS = 7.2;
@@ -260,9 +254,10 @@ loader.load(
         child.receiveShadow = true;
 
         if (child.material) {
-          child.material.metalness = 0.75;
-          child.material.roughness = 0.3;
-          child.material.envMapIntensity = 1.5;
+          // Tune materials for polished metal look
+          child.material.metalness = 0.9;         // Higher metallic response
+          child.material.roughness = 0.15;        // Lower roughness for clear specular reflections
+          child.material.envMapIntensity = 2.5;   // Strong reflection intensity
         }
       }
       Object.entries(AXIS_CONFIG).forEach(([key, cfg]) => {
