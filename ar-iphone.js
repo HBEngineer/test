@@ -227,9 +227,9 @@
             const results = XR8.XrController.hitTest(x, y, ['FEATURE_POINT']);
 
             if (results.length > 0) {
-              const { position, rotation } = results[0];
+              const { position } = results[0];
               arGroup.position.set(position.x, position.y, position.z);
-              arGroup.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w);
+              arGroup.quaternion.identity(); // a single FEATURE_POINT hit's rotation isn't reliably clean and was causing the model to render skewed/deformed on placement
               arGroup.visible = true;
               nudge8thWallResize(); // sync again right at the moment of first placement
               placed = true;
