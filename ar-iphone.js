@@ -9,7 +9,7 @@
 // tags in index.html) and its own separate scene/model, rather than
 // sharing main.js's ES-module THREE objects directly.
 //
-// To stay in sync with the live gantry position without a second MQTT
+// To stay in sync with the live joint angles without a second MQTT
 // connection or duplicated config, this reads from window.GANTRY_CONFIG,
 // which main.js populates and keeps updated on every MQTT message.
 // ==========================================
@@ -87,15 +87,16 @@
     });
   };
 
-  // --- The pipeline module that actually loads the gantry model and
-  // drives it from the live MQTT-derived positions ---
-  const gantryArPipelineModule = () => {
+  // --- The pipeline module that actually loads the robot model and
+  // drives its six rotary joints from the live MQTT-derived angles (degrees) ---
+  const jakaArPipelineModule = () => {
     let arGroup = null;
     let placed = false;
-    const axisStateAR = {}; // { PosX: { node, axis, sign, initial }, ... } - this scene's own copy
+    const axisStateAR = {}; // { PosA1: { node, axisVec, sign, offsetRad, restQuat, current }, ... } - this scene's own copy
+    let jointQuat = null;   // scratch quaternion, created in onStart once THREE is known to be available
 
     return {
-      name: 'gantry-ar-placer',
+      name: 'jaka-ar-placer',
 
       onStart: ({ canvas: pipelineCanvas }) => {
         try {
@@ -113,31 +114,37 @@
             return;
           }
 
+          jointQuat = new CapturedTHREE.Quaternion();
+
           const { scene } = XR8.Threejs.xrScene();
 
           // Lighting for this scene - independent of the desktop scene's
           // lights, since this is a separate THREE instance. Matches the
           // same values as main.js's current defaults; if you retune the
           // lighting there, update these to match.
-          const hemi = new CapturedTHREE.HemisphereLight(0xffffff, 0x444444, 0.7);
-          hemi.position.set(20, 20, 20);
+          const hemi = new CapturedTHREE.HemisphereLight(0xb0e0e6, 0x555555, 1);
+          hemi.position.set(0, 20, 0);
           scene.add(hemi);
 
-          const key = new CapturedTHREE.DirectionalLight(0xffffff, 2.0);
+          const key = new CapturedTHREE.DirectionalLight(0xffffff, 1.0);
           key.position.set(4, 6, 4);
           scene.add(key);
 
-          const fill = new CapturedTHREE.DirectionalLight(0xffffff, 2.0);
+          const fill = new CapturedTHREE.DirectionalLight(0xbbe0ff, 0.5);
           fill.position.set(-4, 3, -3);
           scene.add(fill);
 
-          scene.add(new CapturedTHREE.AmbientLight(0xffffff, 1));
+          scene.add(new CapturedTHREE.AmbientLight(0xedf5ff, 0.5));
+
+          const arCameraLight = new CapturedTHREE.DirectionalLight(0xffffff, 2);
+          arCameraLight.position.set(0, 1, 1);
+          XR8.Threejs.xrScene().camera.add(arCameraLight);
 
           arGroup = new CapturedTHREE.Group();
           arGroup.visible = false;
           scene.add(arGroup);
 
-          setOverlayText('Loading gantry model...');
+          setOverlayText('Loading robot model...');
           const gltfLoader = new CapturedGLTFLoader();
           const loadStartedAt = Date.now();
           let lastProgressAt = Date.now();
@@ -164,9 +171,15 @@
                   if (child.name === axisCfg.nodeName) {
                     axisStateAR[axisKey] = {
                       node: child,
-                      axis: axisCfg.axis,
+                      axisVec: new CapturedTHREE.Vector3(
+                        axisCfg.axis === 'x' ? 1 : 0,
+                        axisCfg.axis === 'y' ? 1 : 0,
+                        axisCfg.axis === 'z' ? 1 : 0
+                      ),
                       sign: axisCfg.sign,
-                      initial: child.position[axisCfg.axis]
+                      offsetRad: CapturedTHREE.MathUtils.degToRad(axisCfg.offset || 0),
+                      restQuat: child.quaternion.clone(), // orientation baked into the GLB
+                      current: 0 // smoothed angle, degrees
                     };
                   }
                 });
@@ -180,11 +193,11 @@
               if (xhr.lengthComputable) {
                 const pct = Math.min(100, Math.round((xhr.loaded / xhr.total) * 100));
                 const mb = (xhr.total / 1024 / 1024).toFixed(1);
-                setOverlayText(`Loading gantry model... ${pct}% (${mb}MB total)`);
+                setOverlayText(`Loading robot model... ${pct}% (${mb}MB total)`);
                 console.log(`[AR] Model load progress: ${pct}% (${xhr.loaded}/${xhr.total} bytes)`);
               } else {
                 const mbLoaded = (xhr.loaded / 1024 / 1024).toFixed(1);
-                setOverlayText(`Loading gantry model... ${mbLoaded}MB loaded`);
+                setOverlayText(`Loading robot model... ${mbLoaded}MB loaded`);
                 console.log(`[AR] Model load progress: ${xhr.loaded} bytes (total size unknown)`);
               }
             },
@@ -219,11 +232,14 @@
 
       onUpdate: () => {
         const cfg = window.GANTRY_CONFIG;
-        if (!cfg) return;
+        if (!cfg || !jointQuat) return;
         Object.entries(axisStateAR).forEach(([key, state]) => {
-          const targetRaw = cfg.mqttTargets[key] || 0;
-          const targetValue = state.initial + (targetRaw * cfg.SCALE_FACTOR * state.sign);
-          state.node.position[state.axis] += (targetValue - state.node.position[state.axis]) * cfg.LERP_FACTOR;
+          const target = cfg.mqttTargets[key] || 0; // degrees, from main.js
+          state.current += (target - state.current) * cfg.LERP_FACTOR;
+          const angle = CapturedTHREE.MathUtils.degToRad(state.current * state.sign) + state.offsetRad;
+          // rest orientation * rotation about the node's local axis (same maths as main.js)
+          jointQuat.setFromAxisAngle(state.axisVec, angle);
+          state.node.quaternion.copy(state.restQuat).multiply(jointQuat);
         });
       }
     };
@@ -246,7 +262,7 @@
           XRExtras.FullWindowCanvas.pipelineModule(), // official 8th Wall module: keeps the canvas correctly filling the window across orientation changes - replaces our hand-rolled resize code, which was causing the small-canvas/deformation/trembling symptoms
           XR8.Threejs.pipelineModule(),           // creates the AR three.js scene
           XR8.XrController.pipelineModule(),      // enables SLAM world tracking
-          gantryArPipelineModule()
+          jakaArPipelineModule()
         ]);
         modulesAdded = true;
       }
