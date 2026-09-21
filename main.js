@@ -89,7 +89,7 @@ keyLight.shadow.normalBias = 0.003;     // CHANGED: Reduced from 0.02 so shadows
 keyLight.shadow.mapSize.set(2048, 2048);
 keyLight.shadow.camera.near = 0.5;
 keyLight.shadow.camera.far = 10;        // CHANGED: Reduced far plane to focus shadow depth
-keyLight.shadow.camera.left = -1.8;     // CHANGED: Tightened shadow bounds around the gantry model size
+keyLight.shadow.camera.left = -1.8;     // CHANGED: Tightened shadow bounds around the robot model size
 keyLight.shadow.camera.right = 1.8;    // CHANGED: Higher resolution shadow detail inside smaller bounds
 keyLight.shadow.camera.top = 1.8;      // CHANGED
 keyLight.shadow.camera.bottom = -1.8;  // CHANGED
@@ -235,23 +235,38 @@ if (ctrlAngle) {
 // ==========================================
 // 4. LOAD GLB MODEL
 // ==========================================
+// Rotary joints. Each joint rotates its GLB node about one of the node's LOCAL axes.
+//   axis   : local axis of the node ('x' | 'y' | 'z')
+//   sign   : +1 / -1, flips the rotation direction
+//   offset : degrees added after the sign (use it if the GLB rest pose != controller zero)
+// The axis / sign values below are starting values derived from the GLB hierarchy;
+// verify them with jakaSet() / jakaDump() in the browser console (see section 4b).
 const AXIS_CONFIG = {
-  PosX: { nodeName: 'Slide_X', axis: 'z', valueElementId: 'val-x', sign: 1 },
-  PosY: { nodeName: 'Slide_Y', axis: 'z', valueElementId: 'val-y', sign: 1 },
-  PosZ: { nodeName: 'Slide_Z', axis: 'y', valueElementId: 'val-z', sign: -1 }
+  PosA1: { nodeName: 'Degree1', axis: 'y', sign:  1, offset: 0, valueElementId: 'val-a1' },
+  PosA2: { nodeName: 'Degree2', axis: 'y', sign:  1, offset: 0, valueElementId: 'val-a2' },
+  PosA3: { nodeName: 'Degree3', axis: 'y', sign: -1, offset: 0, valueElementId: 'val-a3' },
+  PosA4: { nodeName: 'Degree4', axis: 'x', sign:  1, offset: 0, valueElementId: 'val-a4' },
+  PosA5: { nodeName: 'Degree5', axis: 'x', sign:  1, offset: 0, valueElementId: 'val-a5' },
+  PosA6: { nodeName: 'Degree6', axis: 'z', sign:  1, offset: 0, valueElementId: 'val-a6' }
+};
+
+const AXIS_VECTORS = {
+  x: new THREE.Vector3(1, 0, 0),
+  y: new THREE.Vector3(0, 1, 0),
+  z: new THREE.Vector3(0, 0, 1)
 };
 
 const axisState = {};
-const SCALE_FACTOR = 0.001;
 const LERP_FACTOR = 0.05;
 const MODEL_URL = './model/Jaka_A5.glb';
 
+// Name kept as GANTRY_CONFIG so ar-iphone.js keeps finding it (that file still needs
+// updating for rotation, see notes).
 window.GANTRY_CONFIG = {
   AXIS_CONFIG,
-  SCALE_FACTOR,
   LERP_FACTOR,
   MODEL_URL,
-  mqttTargets: { PosX: 0, PosY: 0, PosZ: 0 }
+  mqttTargets: { PosA1: 0, PosA2: 0, PosA3: 0, PosA4: 0, PosA5: 0, PosA6: 0 }
 };
 
 const loader = new GLTFLoader();
@@ -277,10 +292,13 @@ loader.load(
         if (child.name === cfg.nodeName) {
           axisState[key] = {
             node: child,
-            axis: cfg.axis,
+            axisName: cfg.axis,
+            axisVec: AXIS_VECTORS[cfg.axis],
             sign: cfg.sign,
-            initial: child.position[cfg.axis],
-            target: 0
+            offsetRad: THREE.MathUtils.degToRad(cfg.offset || 0),
+            restQuat: child.quaternion.clone(), // orientation baked into the GLB
+            current: 0, // smoothed angle, degrees
+            target: 0   // latest angle from MQTT, degrees
           };
         }
       });
@@ -303,12 +321,42 @@ loader.load(
 );
 
 // ==========================================
+// 4b. CALIBRATION HELPERS (browser console)
+// ==========================================
+// Stop MQTT from overriding a manual test:   jakaIgnoreMqtt = true
+// Drive one joint, optionally trying another local axis / sign / offset:
+//   jakaSet('PosA2', { deg: 30 })
+//   jakaSet('PosA2', { deg: 30, axis: 'z', sign: -1 })
+// Print the current settings in AXIS_CONFIG format:   jakaDump()
+window.jakaIgnoreMqtt = false;
+
+window.jakaSet = (key, { deg, axis, sign, offset } = {}) => {
+  const st = axisState[key];
+  if (!st) { console.warn('[jakaSet] unknown or not loaded:', key); return; }
+  if (axis !== undefined) { st.axisName = axis; st.axisVec = AXIS_VECTORS[axis]; }
+  if (sign !== undefined) st.sign = sign;
+  if (offset !== undefined) st.offsetRad = THREE.MathUtils.degToRad(offset);
+  if (deg !== undefined) st.target = deg;
+};
+
+window.jakaDump = () => {
+  Object.entries(axisState).forEach(([key, st]) => {
+    console.log(`${key}: axis '${st.axisName}', sign ${st.sign}, offset ${THREE.MathUtils.radToDeg(st.offsetRad)}`);
+  });
+};
+
+// ==========================================
 // 5. ANIMATION & RENDER LOOP
 // ==========================================
+const jointQuat = new THREE.Quaternion();
+
 function animate(timestamp, frame) {
-  Object.values(axisState).forEach(({ node, axis, sign, initial, target }) => {
-    const targetValue = initial + (target * SCALE_FACTOR * sign);
-    node.position[axis] += (targetValue - node.position[axis]) * LERP_FACTOR;
+  Object.values(axisState).forEach((st) => {
+    st.current += (st.target - st.current) * LERP_FACTOR;
+    const angle = THREE.MathUtils.degToRad(st.current * st.sign) + st.offsetRad;
+    // rest orientation * rotation about the node's local axis
+    jointQuat.setFromAxisAngle(st.axisVec, angle);
+    st.node.quaternion.copy(st.restQuat).multiply(jointQuat);
   });
 
   if (renderer.xr.isPresenting && frame) {
@@ -374,12 +422,15 @@ window.addEventListener('resize', () => {
 // ==========================================
 // 6. UPDATE TARGET VALUES FROM MQTT
 // ==========================================
-function updateAxisPosition(key, positionVal) {
-  window.GANTRY_CONFIG.mqttTargets[key] = positionVal;
+function updateAxisPosition(key, rawValue) {
+  if (window.jakaIgnoreMqtt) return;
+  const angleDeg = Number(rawValue);
+  if (!Number.isFinite(angleDeg)) return;
+  window.GANTRY_CONFIG.mqttTargets[key] = angleDeg;
   if (!axisState[key]) return;
-  axisState[key].target = positionVal;
+  axisState[key].target = angleDeg;
   const valElem = document.getElementById(AXIS_CONFIG[key].valueElementId);
-  if (valElem) valElem.innerText = `${positionVal} mm`;
+  if (valElem) valElem.innerText = `${angleDeg.toFixed(1)} °`;
 }
 
 // ==========================================
@@ -414,9 +465,9 @@ client.on('connect', () => {
 client.on('message', (topic, message) => {
   try {
     const payload = JSON.parse(message.toString());
-    if (payload.PosX !== undefined) updateAxisPosition('PosX', payload.PosX);
-    if (payload.PosY !== undefined) updateAxisPosition('PosY', payload.PosY);
-    if (payload.PosZ !== undefined) updateAxisPosition('PosZ', payload.PosZ);
+    Object.keys(AXIS_CONFIG).forEach((key) => {
+      if (payload[key] !== undefined) updateAxisPosition(key, payload[key]);
+    });
   } catch (err) {
     console.error('[MQTT] Parse error:', err);
   }
