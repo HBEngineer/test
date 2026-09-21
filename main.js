@@ -244,7 +244,7 @@ const AXIS_CONFIG = {
 const axisState = {};
 const SCALE_FACTOR = 0.001;
 const LERP_FACTOR = 0.05;
-const MODEL_URL = './model/hgosydney_Kinetic.glb';
+const MODEL_URL = './model/Jaka_A5.glb';
 
 window.GANTRY_CONFIG = {
   AXIS_CONFIG,
