@@ -12,9 +12,9 @@ import { ARButton } from 'three/addons/webxr/ARButton.js';
 // ==========================================
 const HIVEMQ_HOST = "0bd403ef4ed0449a81d8e2de7a705113.s1.eu.hivemq.cloud";
 const HIVEMQ_PORT = 8884;
-const HIVEMQ_USERNAME = "FestoPLC1";
-const HIVEMQ_PASSWORD = "FestoPLC1";
-const MQTT_TOPIC = "festo/hgosydney/positions";
+const HIVEMQ_USERNAME = "JakaA5_00";
+const HIVEMQ_PASSWORD = "JakaA5_00";
+const MQTT_TOPIC = "jaka/coordinates";
 
 // ==========================================
 // 2. THREE.JS SCENE & WEBXR SETUP
