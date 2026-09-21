@@ -247,7 +247,7 @@ const AXIS_CONFIG = {
   PosA3: { nodeName: 'Degree3', axis: 'y', sign: -1, offset: 0, valueElementId: 'val-a3' },
   PosA4: { nodeName: 'Degree4', axis: 'x', sign:  1, offset: 0, valueElementId: 'val-a4' },
   PosA5: { nodeName: 'Degree5', axis: 'x', sign:  1, offset: 0, valueElementId: 'val-a5' },
-  PosA6: { nodeName: 'Degree6', axis: 'z', sign:  1, offset: 0, valueElementId: 'val-a6' }
+  PosA6: { nodeName: 'Degree6', axis: 'y', sign:  1, offset: 0, valueElementId: 'val-a6' }
 };
 
 const AXIS_VECTORS = {
