@@ -275,7 +275,7 @@ if (ctrlAngle) {
 // ============================================================================
 const AXIS_CONFIG = {
   PosA1: { nodeName: 'Degree1', axis: 'y', sign:  1, offset: 0, valueElementId: 'val-a1' },
-  PosA2: { nodeName: 'Degree2', axis: 'y', sign:  1, offset: 0, valueElementId: 'val-a2' },
+  PosA2: { nodeName: 'Degree2', axis: 'z', sign:  1, offset: 0, valueElementId: 'val-a2' },
   PosA3: { nodeName: 'Degree3', axis: 'y', sign: -1, offset: 0, valueElementId: 'val-a3' },
   PosA4: { nodeName: 'Degree4', axis: 'x', sign:  1, offset: 0, valueElementId: 'val-a4' },
   PosA5: { nodeName: 'Degree5', axis: 'x', sign:  1, offset: 0, valueElementId: 'val-a5' },
