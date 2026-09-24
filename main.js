@@ -19,9 +19,9 @@ import { ARButton } from 'three/addons/webxr/ARButton.js';
 // published JSON keys need to match exactly (see section 6/7 further down).
 const HIVEMQ_HOST = "0bd403ef4ed0449a81d8e2de7a705113.s1.eu.hivemq.cloud";
 const HIVEMQ_PORT = 8884;
-const HIVEMQ_USERNAME = "JakaA5_00";
-const HIVEMQ_PASSWORD = "JakaA5_00";
-const MQTT_TOPIC = "jaka/coordinates";
+const HIVEMQ_USERNAME = "Robot6DOF_00";
+const HIVEMQ_PASSWORD = "Robot6DOF_00";
+const MQTT_TOPIC = "robot/coordinates";
 
 // ==========================================
 // 2. THREE.JS SCENE & WEBXR SETUP
@@ -247,7 +247,7 @@ if (ctrlAngle) {
 //   sign   : +1 / -1, flips the rotation direction
 //   offset : degrees added after the sign (use it if the GLB rest pose != controller zero)
 // The axis / sign values below are starting values derived from the GLB hierarchy;
-// verify them with jakaSet() / jakaDump() in the browser console (see section 4b).
+// verify them with robotSet() / robotDump() in the browser console (see section 4b).
 //
 // ============================================================================
 // *** MODIFY HERE for a different 3D model / different number of joints ***
@@ -264,7 +264,7 @@ if (ctrlAngle) {
 //      rotates about in the new model - this is very often different per
 //      node and per model, so don't assume it matches the old robot.
 //   4. `sign` / `offset` are calibration values - leave them at sign: 1,
-//      offset: 0 initially, then use jakaSet()/jakaDump() (section 4b below)
+//      offset: 0 initially, then use robotSet()/robotDump() (section 4b below)
 //      in the browser console to dial them in against the real hardware.
 //   5. The object KEY (e.g. "PosA1") is also the property name the code
 //      expects in the incoming MQTT JSON payload - see section 6/7 below,
@@ -344,7 +344,7 @@ loader.load(
       // the loaded GLB and, for each entry in AXIS_CONFIG above whose
       // nodeName matches, wires that node up to be driven live. If a joint
       // you added to AXIS_CONFIG never shows up in axisState (check with
-      // jakaDump() in the console), the nodeName doesn't match anything in
+      // robotDump() in the console), the nodeName doesn't match anything in
       // this particular GLB - fix the nodeName in AXIS_CONFIG, not here.
       Object.entries(AXIS_CONFIG).forEach(([key, cfg]) => {
         if (child.name === cfg.nodeName) {
@@ -387,23 +387,23 @@ loader.load(
 // ==========================================
 // 4b. CALIBRATION HELPERS (browser console)
 // ==========================================
-// Stop MQTT from overriding a manual test:   jakaIgnoreMqtt = true
+// Stop MQTT from overriding a manual test:   robotIgnoreMqtt = true
 // Drive one joint, optionally trying another local axis / sign / offset:
-//   jakaSet('PosA2', { deg: 30 })
-//   jakaSet('PosA2', { deg: 30, axis: 'z', sign: -1 })
-// Print the current settings in AXIS_CONFIG format:   jakaDump()
-window.jakaIgnoreMqtt = false;
+//   robotSet('PosA2', { deg: 30 })
+//   robotSet('PosA2', { deg: 30, axis: 'z', sign: -1 })
+// Print the current settings in AXIS_CONFIG format:   robotDump()
+window.robotIgnoreMqtt = false;
 
-window.jakaSet = (key, { deg, axis, sign, offset } = {}) => {
+window.robotSet = (key, { deg, axis, sign, offset } = {}) => {
   const st = axisState[key];
-  if (!st) { console.warn('[jakaSet] unknown or not loaded:', key); return; }
+  if (!st) { console.warn('[robotSet] unknown or not loaded:', key); return; }
   if (axis !== undefined) { st.axisName = axis; st.axisVec = AXIS_VECTORS[axis]; }
   if (sign !== undefined) st.sign = sign;
   if (offset !== undefined) st.offsetRad = THREE.MathUtils.degToRad(offset);
   if (deg !== undefined) st.target = deg;
 };
 
-window.jakaDump = () => {
+window.robotDump = () => {
   Object.entries(axisState).forEach(([key, st]) => {
     console.log(`${key}: axis '${st.axisName}', sign ${st.sign}, offset ${THREE.MathUtils.radToDeg(st.offsetRad)}`);
   });
@@ -487,7 +487,7 @@ window.addEventListener('resize', () => {
 // 6. UPDATE TARGET VALUES FROM MQTT
 // ==========================================
 function updateAxisPosition(key, rawValue) {
-  if (window.jakaIgnoreMqtt) return;
+  if (window.robotIgnoreMqtt) return;
   const angleDeg = Number(rawValue);
   if (!Number.isFinite(angleDeg)) return;
   window.GANTRY_CONFIG.mqttTargets[key] = angleDeg;
@@ -503,7 +503,7 @@ function updateAxisPosition(key, rawValue) {
 const brokerUrl = `wss://${HIVEMQ_HOST}:${HIVEMQ_PORT}/mqtt`;
 
 const client = mqtt.connect(brokerUrl, {
-  clientId: 'Jaka_a5_twin_' + Math.random().toString(16).substring(2, 10),
+  clientId: 'robot_twin_' + Math.random().toString(16).substring(2, 10),
   username: HIVEMQ_USERNAME,
   password: HIVEMQ_PASSWORD,
   clean: true

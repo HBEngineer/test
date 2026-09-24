@@ -89,14 +89,14 @@
 
   // --- The pipeline module that actually loads the robot model and
   // drives its six rotary joints from the live MQTT-derived angles (degrees) ---
-  const jakaArPipelineModule = () => {
+  const robotArPipelineModule = () => {
     let arGroup = null;
     let placed = false;
     const axisStateAR = {}; // { PosA1: { node, axisVec, sign, offsetRad, restQuat, current }, ... } - this scene's own copy
     let jointQuat = null;   // scratch quaternion, created in onStart once THREE is known to be available
 
     return {
-      name: 'jaka-ar-placer',
+      name: 'robot-ar-placer',
 
       onStart: ({ canvas: pipelineCanvas }) => {
         try {
@@ -274,7 +274,7 @@
           XRExtras.FullWindowCanvas.pipelineModule(), // official 8th Wall module: keeps the canvas correctly filling the window across orientation changes - replaces our hand-rolled resize code, which was causing the small-canvas/deformation/trembling symptoms
           XR8.Threejs.pipelineModule(),           // creates the AR three.js scene
           XR8.XrController.pipelineModule(),      // enables SLAM world tracking
-          jakaArPipelineModule()
+          robotArPipelineModule()
         ]);
         modulesAdded = true;
       }
