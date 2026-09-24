@@ -114,11 +114,11 @@ hemiLight.position.set(0, 20, 0);
 scene.add(hemiLight);
 
 const BASE_INTENSITIES = {
-  key: 2.0,
+  key: 1.0,
   fill: 1.0,
-  ambient: 1,
-  hemi: 1,
-  camera: 2
+  ambient: 0.5,
+  hemi: 0.5,
+  camera: 1
 };
 
 // --- AR GROUP & FLOOR MAT ---
