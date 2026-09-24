@@ -278,7 +278,7 @@ const AXIS_CONFIG = {
   PosA2: { nodeName: 'Degree2', axis: 'z', sign:  1, offset: 0, valueElementId: 'val-a2' },
   PosA3: { nodeName: 'Degree3', axis: 'z', sign:  1, offset: 0, valueElementId: 'val-a3' },
   PosA4: { nodeName: 'Degree4', axis: 'x', sign:  1, offset: 0, valueElementId: 'val-a4' },
-  PosA5: { nodeName: 'Degree5', axis: 'y', sign:  1, offset: 0, valueElementId: 'val-a5' },
+  PosA5: { nodeName: 'Degree5', axis: 'z', sign:  1, offset: 0, valueElementId: 'val-a5' },
   PosA6: { nodeName: 'Degree6', axis: 'y', sign:  1, offset: 0, valueElementId: 'val-a6' }
   // Add/remove entries here to change the DOF count. Every entry added here
   // needs a matching HTML telemetry row (index.html) and, if you want the
