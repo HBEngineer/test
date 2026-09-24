@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <!-- Cosmetic only - rename for a different robot/model -->
   <title>Jaka Digital Twin</title>
 
   <!-- Favicon -->
@@ -40,6 +41,14 @@
       <div id="dot" class="dot"></div>
       <span id="status">Connecting...</span>
     </div>
+    <!--
+      *** MODIFY HERE to match the degrees of freedom in main.js's AXIS_CONFIG ***
+      One .telemetry-row per joint you're animating. Each row's id (e.g.
+      "val-a1") must exactly match the corresponding `valueElementId` set in
+      main.js's AXIS_CONFIG for that joint - main.js writes the live angle
+      into whatever element has that id. Add/remove rows here to match
+      however many entries AXIS_CONFIG has (more or fewer than 6).
+    -->
     <div class="telemetry-row">
       <span class="telemetry-label">Axis A1:</span>
       <span id="val-a1" class="telemetry-val">0.0 °</span>
@@ -64,6 +73,7 @@
       <span class="telemetry-label">Axis A6:</span>
       <span id="val-a6" class="telemetry-val">0.0 °</span>
     </div>
+    <!-- end telemetry rows -->
   </div>
 
   <!-- Lighting Panel (Closed by default) -->

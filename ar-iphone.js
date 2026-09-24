@@ -118,10 +118,14 @@
 
           const { scene } = XR8.Threejs.xrScene();
 
+          // *** MODIFY HERE if you retune lighting in main.js ***
           // Lighting for this scene - independent of the desktop scene's
-          // lights, since this is a separate THREE instance. Matches the
-          // same values as main.js's current defaults; if you retune the
-          // lighting there, update these to match.
+          // lights, since this is a separate THREE instance (this file runs
+          // its own copy of THREE.js, not the ES-module one in main.js).
+          // These values are NOT read from main.js automatically - they're
+          // hand-copied. If you change BASE_INTENSITIES or the light setup
+          // in main.js, update the matching values below by hand to keep
+          // the desktop view and the iPhone AR view looking consistent.
           const hemi = new CapturedTHREE.HemisphereLight(0xb0e0e6, 0x555555, 1);
           hemi.position.set(0, 20, 0);
           scene.add(hemi);
@@ -144,6 +148,9 @@
           arGroup.visible = false;
           scene.add(arGroup);
 
+          // *** No edits usually needed here *** - cfg.MODEL_URL comes from
+          // main.js's MODEL_URL automatically via window.GANTRY_CONFIG, so
+          // changing which GLB loads only needs to happen in main.js.
           setOverlayText('Loading robot model...');
           const gltfLoader = new CapturedGLTFLoader();
           const loadStartedAt = Date.now();
@@ -166,6 +173,11 @@
               clearInterval(stallCheckInterval);
               const model = gltf.scene;
 
+              // *** No edits usually needed here *** - this reads
+              // window.GANTRY_CONFIG (populated by main.js's AXIS_CONFIG),
+              // so changing the DOF count / node names / axes only needs
+              // to happen in main.js - this file picks up the same config
+              // automatically and doesn't need touching for that.
               model.traverse((child) => {
                 Object.entries(cfg.AXIS_CONFIG).forEach(([axisKey, axisCfg]) => {
                   if (child.name === axisCfg.nodeName) {

@@ -10,6 +10,13 @@ import { ARButton } from 'three/addons/webxr/ARButton.js';
 // ==========================================
 // 1. HIVEMQ CLOUD CREDENTIALS
 // ==========================================
+// *** MODIFY HERE for a different broker / different controller ***
+// Point these at whichever MQTT broker the new controller/PLC publishes to.
+// MQTT_TOPIC must match the topic the controller publishes joint angles on.
+// The JSON payload published on that topic must have one numeric property
+// per AXIS_CONFIG key below (e.g. {"PosA1": 12.3, "PosA2": -4.0, ...}) -
+// if you rename or add/remove axis keys in AXIS_CONFIG, the controller's
+// published JSON keys need to match exactly (see section 6/7 further down).
 const HIVEMQ_HOST = "0bd403ef4ed0449a81d8e2de7a705113.s1.eu.hivemq.cloud";
 const HIVEMQ_PORT = 8884;
 const HIVEMQ_USERNAME = "JakaA5_00";
@@ -241,6 +248,31 @@ if (ctrlAngle) {
 //   offset : degrees added after the sign (use it if the GLB rest pose != controller zero)
 // The axis / sign values below are starting values derived from the GLB hierarchy;
 // verify them with jakaSet() / jakaDump() in the browser console (see section 4b).
+//
+// ============================================================================
+// *** MODIFY HERE for a different 3D model / different number of joints ***
+// ============================================================================
+// This object is the single source of truth for the robot's degrees of freedom.
+// To adapt the twin to a different model:
+//   1. Add or remove one entry per rotary joint you want driven live. The
+//      NUMBER OF ENTRIES here = the number of degrees of freedom the twin
+//      animates. A 4-axis SCARA needs 4 entries; a 7-axis arm needs 7.
+//   2. `nodeName` MUST exactly match the name of that joint's object/node
+//      inside the new GLB file (open the GLB in Blender, or console.log()
+//      every child.name during model.traverse() below, to find the names).
+//   3. `axis` is whichever of the node's own local x/y/z the joint actually
+//      rotates about in the new model - this is very often different per
+//      node and per model, so don't assume it matches the old robot.
+//   4. `sign` / `offset` are calibration values - leave them at sign: 1,
+//      offset: 0 initially, then use jakaSet()/jakaDump() (section 4b below)
+//      in the browser console to dial them in against the real hardware.
+//   5. The object KEY (e.g. "PosA1") is also the property name the code
+//      expects in the incoming MQTT JSON payload - see section 6/7 below,
+//      and keep it in sync with whatever your PLC/controller publishes.
+//   6. `valueElementId` must match an element id that exists in index.html's
+//      status panel (see the HTML file's own comment block) - add/remove a
+//      telemetry row there to match however many entries you have here.
+// ============================================================================
 const AXIS_CONFIG = {
   PosA1: { nodeName: 'Degree1', axis: 'y', sign:  1, offset: 0, valueElementId: 'val-a1' },
   PosA2: { nodeName: 'Degree2', axis: 'y', sign:  1, offset: 0, valueElementId: 'val-a2' },
@@ -248,6 +280,10 @@ const AXIS_CONFIG = {
   PosA4: { nodeName: 'Degree4', axis: 'x', sign:  1, offset: 0, valueElementId: 'val-a4' },
   PosA5: { nodeName: 'Degree5', axis: 'x', sign:  1, offset: 0, valueElementId: 'val-a5' },
   PosA6: { nodeName: 'Degree6', axis: 'y', sign:  1, offset: 0, valueElementId: 'val-a6' }
+  // Add/remove entries here to change the DOF count. Every entry added here
+  // needs a matching HTML telemetry row (index.html) and, if you want the
+  // iPhone AR view to show it too, nothing extra to do - ar-iphone.js reads
+  // this same AXIS_CONFIG object automatically via window.GANTRY_CONFIG.
 };
 
 const AXIS_VECTORS = {
@@ -257,11 +293,22 @@ const AXIS_VECTORS = {
 };
 
 const axisState = {};
-const LERP_FACTOR = 0.05;
-const MODEL_URL = './model/Jaka_A5.glb';
+const LERP_FACTOR = 0.05; // smoothing factor per animation frame (0-1); lower = smoother/slower catch-up to MQTT target
+
+// *** MODIFY HERE to swap in a different 3D model file ***
+// Path/URL to the GLB (or GLTF) file to load, relative to index.html.
+// Swap this to point at a different robot's model. After swapping, re-check
+// every `nodeName` in AXIS_CONFIG above against the new file's actual node
+// names, since they almost never match between different GLBs.
+const MODEL_URL = './model/KukaR1300.glb'  //Jaka_A5.glb';
 
 // Name kept as GANTRY_CONFIG so ar-iphone.js keeps finding it (that file still needs
 // updating for rotation, see notes).
+//
+// *** MODIFY HERE if you changed the AXIS_CONFIG keys above *** - this
+// mqttTargets object needs one `KeyName: 0` entry per key in AXIS_CONFIG
+// (same names). It's just the initial/default state before any MQTT
+// message arrives; updateAxisPosition() (section 6 below) writes into it.
 window.GANTRY_CONFIG = {
   AXIS_CONFIG,
   LERP_FACTOR,
@@ -282,12 +329,23 @@ loader.load(
         child.receiveShadow = true;
 
         if (child.material) {
-          // Polished metallic finish
+          // *** Cosmetic - revisit per model *** these tweak how the loaded
+          // GLB's own materials render (metalness/roughness are commented
+          // out; envMapIntensity controls how strongly the HDR environment
+          // map reflects off the model). A different model's materials may
+          // look better/worse with different values here - purely visual,
+          // safe to leave alone otherwise.
           //child.material.metalness = 0.90;
           //child.material.roughness = 0.18;
           child.material.envMapIntensity = 1.0; // Lowered from 3.5 to match environment settings
         }
       }
+      // *** No edits usually needed here *** - this loop walks every node in
+      // the loaded GLB and, for each entry in AXIS_CONFIG above whose
+      // nodeName matches, wires that node up to be driven live. If a joint
+      // you added to AXIS_CONFIG never shows up in axisState (check with
+      // jakaDump() in the console), the nodeName doesn't match anything in
+      // this particular GLB - fix the nodeName in AXIS_CONFIG, not here.
       Object.entries(AXIS_CONFIG).forEach(([key, cfg]) => {
         if (child.name === cfg.nodeName) {
           axisState[key] = {
@@ -304,6 +362,12 @@ loader.load(
       });
     });
 
+    // *** MODIFY HERE if a different model needs scaling/repositioning ***
+    // A different GLB may not be modeled at the same real-world scale/units
+    // or may not be centered/oriented the way this one is. If the new model
+    // appears too big/small or off-center once loaded, that's usually fixed
+    // right here, e.g.: model.scale.setScalar(0.01); model.position.set(0,0,0);
+    // before it's added to the group below.
     arGroup.add(model);
 
     const box = new THREE.Box3().setFromObject(model);
@@ -465,6 +529,10 @@ client.on('connect', () => {
 client.on('message', (topic, message) => {
   try {
     const payload = JSON.parse(message.toString());
+    // *** No edits usually needed here *** - this automatically loops over
+    // whatever keys exist in AXIS_CONFIG above, so adding/removing joints
+    // there is enough; nothing to change in this handler itself. It simply
+    // ignores any payload property that isn't one of the AXIS_CONFIG keys.
     Object.keys(AXIS_CONFIG).forEach((key) => {
       if (payload[key] !== undefined) updateAxisPosition(key, payload[key]);
     });
