@@ -114,8 +114,8 @@ hemiLight.position.set(0, 20, 0);
 scene.add(hemiLight);
 
 const BASE_INTENSITIES = {
-  key: 4.0,
-  fill: 3.0,
+  key: 3.0,
+  fill: 2.0,
   ambient: 1.8,
   hemi: 1.6,
   camera: 2.2
