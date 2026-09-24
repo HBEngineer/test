@@ -337,7 +337,7 @@ loader.load(
           // safe to leave alone otherwise.
           //child.material.metalness = 0.90;
           //child.material.roughness = 0.18;
-          // child.material.envMapIntensity = 1.0; // Lowered from 3.5 to match environment settings
+          child.material.envMapIntensity = 0.5; // Lowered from 3.5 to match environment settings
         }
       }
       // *** No edits usually needed here *** - this loop walks every node in
