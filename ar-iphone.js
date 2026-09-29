@@ -95,6 +95,25 @@
     const axisStateAR = {}; // { PosA1: { node, axisVec, sign, offsetRad, restQuat, current }, ... } - this scene's own copy
     let jointQuat = null;   // scratch quaternion, created in onStart once THREE is known to be available
 
+    // --- Surface scanning state (mirrors main.js's WebXR hit-test-source
+    // logic in section 5's animate() loop, but re-implemented against 8th
+    // Wall's XR8.XrController.hitTest(), which is a one-shot poll rather
+    // than a continuous hitTestSource - so we call it every onUpdate frame
+    // ourselves to get the same "scan until stable" behavior.) ---
+    let surfaceCurrentlyDetected = false;
+    let firstDetectedAt = null;
+    let lastHitPosition = null; // latest {x,y,z} hit-test result, refreshed every onUpdate while not yet placed
+    const AUTO_PLACE_STABILIZE_MS = 600; // *** KEEP IN SYNC with main.js's AUTO_PLACE_STABILIZE_MS by hand - not read automatically, same reason as the lighting values below ***
+
+    // --- Rotate-after-placement state (single-finger horizontal drag) ---
+    let isDragging = false;
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchMoved = false;
+    let lastTouchX = 0;
+    const DRAG_THRESHOLD_PX = 6;   // movement below this = treated as a tap, not a drag
+    const ROTATE_SENSITIVITY = 0.01; // radians of Y-rotation per pixel of horizontal drag - tune to taste
+
     return {
       name: 'robot-ar-placer',
 
@@ -148,6 +167,17 @@
           arGroup.visible = false;
           scene.add(arGroup);
 
+          // Places and reveals the model at a given hit-test position, and
+          // switches the pipeline over to "placed" state (stops scanning,
+          // stops auto-place, starts accepting rotate-drag touches instead).
+          const placeModel = (position) => {
+            arGroup.position.set(position.x, position.y, position.z);
+            arGroup.quaternion.identity(); // a single FEATURE_POINT hit's rotation isn't reliably clean and was causing the model to render skewed/deformed on placement
+            arGroup.visible = true;
+            placed = true;
+            hideOverlay();
+          };
+
           // *** No edits usually needed here *** - cfg.MODEL_URL comes from
           // main.js's MODEL_URL automatically via window.GANTRY_CONFIG, so
           // changing which GLB loads only needs to happen in main.js.
@@ -198,7 +228,7 @@
               });
 
               arGroup.add(model);
-              setOverlayText('Move your phone to find a surface, then tap it.');
+              setOverlayText('Move your phone to find a surface');
             },
             (xhr) => {
               lastProgressAt = Date.now();
@@ -220,20 +250,43 @@
             }
           );
 
+          // --- Touch handling: one gesture, two meanings depending on state ---
+          //   Before placement: a quick tap (not a drag) places the model
+          //     immediately if a surface is currently detected - an early
+          //     override for people who don't want to wait out the
+          //     AUTO_PLACE_STABILIZE_MS hold-steady timer in onUpdate below.
+          //   After placement: horizontal drag rotates the model around its
+          //     vertical axis instead.
           pipelineCanvas.addEventListener('touchstart', (e) => {
-            if (!arGroup) return;
-            const { width, height } = getViewportSize();
-            const x = e.touches[0].clientX / width;
-            const y = e.touches[0].clientY / height;
-            const results = XR8.XrController.hitTest(x, y, ['FEATURE_POINT']);
+            if (!arGroup || e.touches.length !== 1) return;
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+            touchMoved = false;
+            if (placed) {
+              isDragging = true;
+              lastTouchX = touchStartX;
+            }
+          });
 
-            if (results.length > 0) {
-              const { position } = results[0];
-              arGroup.position.set(position.x, position.y, position.z);
-              arGroup.quaternion.identity(); // a single FEATURE_POINT hit's rotation isn't reliably clean and was causing the model to render skewed/deformed on placement
-              arGroup.visible = true;
-              placed = true;
-              hideOverlay();
+          pipelineCanvas.addEventListener('touchmove', (e) => {
+            if (!arGroup || e.touches.length !== 1) return;
+            const x = e.touches[0].clientX;
+            const y = e.touches[0].clientY;
+            if (Math.abs(x - touchStartX) > DRAG_THRESHOLD_PX || Math.abs(y - touchStartY) > DRAG_THRESHOLD_PX) {
+              touchMoved = true;
+            }
+            if (placed && isDragging) {
+              const deltaX = x - lastTouchX;
+              arGroup.rotation.y += deltaX * ROTATE_SENSITIVITY;
+              lastTouchX = x;
+              e.preventDefault(); // stop the page from scrolling while rotating the model
+            }
+          }, { passive: false }); // passive: false is required for preventDefault() above to take effect
+
+          pipelineCanvas.addEventListener('touchend', () => {
+            isDragging = false;
+            if (!placed && !touchMoved && surfaceCurrentlyDetected && lastHitPosition) {
+              placeModel(lastHitPosition);
             }
           });
         } catch (err) {
@@ -243,6 +296,28 @@
       },
 
       onUpdate: () => {
+        // --- Continuous surface scan, run every frame until the model is
+        // placed (mirrors main.js's animate()-loop hit-test polling for the
+        // Android/WebXR path - see that file's section 5). ---
+        if (arGroup && !placed) {
+          const results = XR8.XrController.hitTest(0.5, 0.5, ['FEATURE_POINT']); // center of screen, like aiming a reticle
+          if (results.length > 0) {
+            lastHitPosition = results[0].position;
+            if (!surfaceCurrentlyDetected) {
+              surfaceCurrentlyDetected = true;
+              firstDetectedAt = Date.now();
+              setOverlayText('Hold steady...');
+            } else if (Date.now() - firstDetectedAt > AUTO_PLACE_STABILIZE_MS) {
+              placeModel(lastHitPosition);
+            }
+          } else {
+            surfaceCurrentlyDetected = false;
+            firstDetectedAt = null;
+            lastHitPosition = null;
+            setOverlayText('Move your phone to find a surface');
+          }
+        }
+
         const cfg = window.GANTRY_CONFIG;
         if (!cfg || !jointQuat) return;
         Object.entries(axisStateAR).forEach(([key, state]) => {
