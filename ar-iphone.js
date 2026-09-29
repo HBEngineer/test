@@ -98,21 +98,28 @@
     // --- Surface scanning state (mirrors main.js's WebXR hit-test-source
     // logic in section 5's animate() loop, but re-implemented against 8th
     // Wall's XR8.XrController.hitTest(), which is a one-shot poll rather
-    // than a continuous hitTestSource - so we call it every onUpdate frame
-    // ourselves to get the same "scan until stable" behavior.) ---
+    // than a continuous hitTestSource - so we call it ourselves on a timer
+    // to get the same "scan until stable" behavior.) ---
     let surfaceCurrentlyDetected = false;
     let firstDetectedAt = null;
-    let lastHitPosition = null; // latest {x,y,z} hit-test result, refreshed every onUpdate while not yet placed
+    let lastHitPosition = null; // latest {x,y,z} hit-test result, refreshed periodically while not yet placed
     const AUTO_PLACE_STABILIZE_MS = 600; // *** KEEP IN SYNC with main.js's AUTO_PLACE_STABILIZE_MS by hand - not read automatically, same reason as the lighting values below ***
+    let lastHitTestAt = 0;
+    const HIT_TEST_INTERVAL_MS = 150; // throttled - calling hitTest() every single frame was heavy enough to visibly stall the camera feed while scanning
 
-    // --- Rotate-after-placement state (single-finger horizontal drag) ---
-    let isDragging = false;
+    // --- Rotate-after-placement state (two-finger twist, like rotating a photo) ---
+    let isRotating = false;
+    let rotationStartAngle = 0;
+    let rotationAtGestureStart = 0;
     let touchStartX = 0;
     let touchStartY = 0;
     let touchMoved = false;
-    let lastTouchX = 0;
-    const DRAG_THRESHOLD_PX = 6;   // movement below this = treated as a tap, not a drag
-    const ROTATE_SENSITIVITY = 0.01; // radians of Y-rotation per pixel of horizontal drag - tune to taste
+    const DRAG_THRESHOLD_PX = 6;   // movement below this = treated as a tap, not a drag/rotate
+
+    // Angle (radians) of the line between two touch points - the delta of
+    // this value between touchstart and touchmove is how far to rotate.
+    const twoFingerAngle = (touches) =>
+      Math.atan2(touches[1].clientY - touches[0].clientY, touches[1].clientX - touches[0].clientX);
 
     return {
       name: 'robot-ar-placer',
@@ -250,42 +257,42 @@
             }
           );
 
-          // --- Touch handling: one gesture, two meanings depending on state ---
-          //   Before placement: a quick tap (not a drag) places the model
-          //     immediately if a surface is currently detected - an early
-          //     override for people who don't want to wait out the
-          //     AUTO_PLACE_STABILIZE_MS hold-steady timer in onUpdate below.
-          //   After placement: horizontal drag rotates the model around its
-          //     vertical axis instead.
+          // --- Touch handling: one finger = tap-to-place-early (before
+          // placement); two fingers = twist-to-rotate (after placement).
           pipelineCanvas.addEventListener('touchstart', (e) => {
-            if (!arGroup || e.touches.length !== 1) return;
-            touchStartX = e.touches[0].clientX;
-            touchStartY = e.touches[0].clientY;
-            touchMoved = false;
-            if (placed) {
-              isDragging = true;
-              lastTouchX = touchStartX;
+            if (!arGroup) return;
+            if (e.touches.length === 1) {
+              touchStartX = e.touches[0].clientX;
+              touchStartY = e.touches[0].clientY;
+              touchMoved = false;
+              isRotating = false; // a second finger landing mid-gesture shouldn't inherit a stale rotate state
+            } else if (e.touches.length === 2 && placed) {
+              isRotating = true;
+              rotationStartAngle = twoFingerAngle(e.touches);
+              rotationAtGestureStart = arGroup.rotation.y;
             }
           });
 
           pipelineCanvas.addEventListener('touchmove', (e) => {
-            if (!arGroup || e.touches.length !== 1) return;
-            const x = e.touches[0].clientX;
-            const y = e.touches[0].clientY;
-            if (Math.abs(x - touchStartX) > DRAG_THRESHOLD_PX || Math.abs(y - touchStartY) > DRAG_THRESHOLD_PX) {
-              touchMoved = true;
+            if (!arGroup) return;
+            if (e.touches.length === 2 && placed && isRotating) {
+              const angle = twoFingerAngle(e.touches);
+              arGroup.rotation.y = rotationAtGestureStart + (angle - rotationStartAngle);
+              e.preventDefault(); // stop the page from scrolling/zooming while rotating the model
+              return;
             }
-            if (placed && isDragging) {
-              const deltaX = x - lastTouchX;
-              arGroup.rotation.y += deltaX * ROTATE_SENSITIVITY;
-              lastTouchX = x;
-              e.preventDefault(); // stop the page from scrolling while rotating the model
+            if (e.touches.length === 1 && !placed) {
+              const x = e.touches[0].clientX;
+              const y = e.touches[0].clientY;
+              if (Math.abs(x - touchStartX) > DRAG_THRESHOLD_PX || Math.abs(y - touchStartY) > DRAG_THRESHOLD_PX) {
+                touchMoved = true;
+              }
             }
           }, { passive: false }); // passive: false is required for preventDefault() above to take effect
 
-          pipelineCanvas.addEventListener('touchend', () => {
-            isDragging = false;
-            if (!placed && !touchMoved && surfaceCurrentlyDetected && lastHitPosition) {
+          pipelineCanvas.addEventListener('touchend', (e) => {
+            if (e.touches.length < 2) isRotating = false;
+            if (!placed && !touchMoved && e.touches.length === 0 && surfaceCurrentlyDetected && lastHitPosition) {
               placeModel(lastHitPosition);
             }
           });
@@ -296,25 +303,31 @@
       },
 
       onUpdate: () => {
-        // --- Continuous surface scan, run every frame until the model is
-        // placed (mirrors main.js's animate()-loop hit-test polling for the
-        // Android/WebXR path - see that file's section 5). ---
+        // --- Continuous (but throttled) surface scan, until the model is
+        // placed. Mirrors main.js's animate()-loop hit-test polling for the
+        // Android/WebXR path (see that file's section 5), but only actually
+        // calls hitTest() every HIT_TEST_INTERVAL_MS - calling it every
+        // single frame was heavy enough to visibly stall the camera feed. ---
         if (arGroup && !placed) {
-          const results = XR8.XrController.hitTest(0.5, 0.5, ['FEATURE_POINT']); // center of screen, like aiming a reticle
-          if (results.length > 0) {
-            lastHitPosition = results[0].position;
-            if (!surfaceCurrentlyDetected) {
-              surfaceCurrentlyDetected = true;
-              firstDetectedAt = Date.now();
-              setOverlayText('Hold steady...');
-            } else if (Date.now() - firstDetectedAt > AUTO_PLACE_STABILIZE_MS) {
-              placeModel(lastHitPosition);
+          const now = Date.now();
+          if (now - lastHitTestAt >= HIT_TEST_INTERVAL_MS) {
+            lastHitTestAt = now;
+            const results = XR8.XrController.hitTest(0.5, 0.5, ['FEATURE_POINT']); // center of screen, like aiming a reticle
+            if (results.length > 0) {
+              lastHitPosition = results[0].position;
+              if (!surfaceCurrentlyDetected) {
+                surfaceCurrentlyDetected = true;
+                firstDetectedAt = now;
+                setOverlayText('Hold steady...');
+              } else if (now - firstDetectedAt > AUTO_PLACE_STABILIZE_MS) {
+                placeModel(lastHitPosition);
+              }
+            } else {
+              surfaceCurrentlyDetected = false;
+              firstDetectedAt = null;
+              lastHitPosition = null;
+              setOverlayText('Move your phone to find a surface');
             }
-          } else {
-            surfaceCurrentlyDetected = false;
-            firstDetectedAt = null;
-            lastHitPosition = null;
-            setOverlayText('Move your phone to find a surface');
           }
         }
 
