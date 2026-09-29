@@ -95,26 +95,13 @@
     const axisStateAR = {}; // { PosA1: { node, axisVec, sign, offsetRad, restQuat, current }, ... } - this scene's own copy
     let jointQuat = null;   // scratch quaternion, created in onStart once THREE is known to be available
 
-    // --- Surface scanning state (mirrors main.js's WebXR hit-test-source
-    // logic in section 5's animate() loop, but re-implemented against 8th
-    // Wall's XR8.XrController.hitTest(), which is a one-shot poll rather
-    // than a continuous hitTestSource - so we call it ourselves on a timer
-    // to get the same "scan until stable" behavior.) ---
-    let surfaceCurrentlyDetected = false;
-    let firstDetectedAt = null;
-    let lastHitPosition = null; // latest {x,y,z} hit-test result, refreshed periodically while not yet placed
-    const AUTO_PLACE_STABILIZE_MS = 600; // *** KEEP IN SYNC with main.js's AUTO_PLACE_STABILIZE_MS by hand - not read automatically, same reason as the lighting values below ***
-    let lastHitTestAt = 0;
-    const HIT_TEST_INTERVAL_MS = 150; // throttled - calling hitTest() every single frame was heavy enough to visibly stall the camera feed while scanning
-
-    // --- Rotate-after-placement state (two-finger twist, like rotating a photo) ---
-    let isRotating = false;
-    let rotationStartAngle = 0;
-    let rotationAtGestureStart = 0;
-    let touchStartX = 0;
-    let touchStartY = 0;
-    let touchMoved = false;
-    const DRAG_THRESHOLD_PX = 6;   // movement below this = treated as a tap, not a drag/rotate
+    // --- Transform-after-placement state (two-finger twist = rotate,
+    // two-finger drag = move, and you can do both in the same gesture) ---
+    let isTransforming = false;
+    let lastAngle = 0;
+    let lastMidX = 0;
+    let lastMidY = 0;
+    const MOVE_SENSITIVITY = 0.0015;  // world meters of translation per pixel of two-finger midpoint movement - tune to taste
 
     // Angle (radians) of the line between two touch points - the delta of
     // this value between touchstart and touchmove is how far to rotate.
@@ -175,8 +162,8 @@
           scene.add(arGroup);
 
           // Places and reveals the model at a given hit-test position, and
-          // switches the pipeline over to "placed" state (stops scanning,
-          // stops auto-place, starts accepting rotate-drag touches instead).
+          // switches the pipeline into "placed" state (tap-to-place is done,
+          // two-finger rotate/move becomes active).
           const placeModel = (position) => {
             arGroup.position.set(position.x, position.y, position.z);
             arGroup.quaternion.identity(); // a single FEATURE_POINT hit's rotation isn't reliably clean and was causing the model to render skewed/deformed on placement
@@ -235,7 +222,7 @@
               });
 
               arGroup.add(model);
-              setOverlayText('Move your phone to find a surface');
+              setOverlayText('Move your phone to find a surface, then tap it.');
             },
             (xhr) => {
               lastProgressAt = Date.now();
@@ -257,44 +244,61 @@
             }
           );
 
-          // --- Touch handling: one finger = tap-to-place-early (before
-          // placement); two fingers = twist-to-rotate (after placement).
+          // --- Touch handling: one finger = tap-to-place (the original,
+          // known-working behavior - hit-test right at the tap point and
+          // place immediately if it hits); two fingers = combined
+          // twist-to-rotate + drag-to-move, once the model is placed.
           pipelineCanvas.addEventListener('touchstart', (e) => {
             if (!arGroup) return;
-            if (e.touches.length === 1) {
-              touchStartX = e.touches[0].clientX;
-              touchStartY = e.touches[0].clientY;
-              touchMoved = false;
-              isRotating = false; // a second finger landing mid-gesture shouldn't inherit a stale rotate state
+            if (e.touches.length === 1 && !placed) {
+              const { width, height } = getViewportSize();
+              const x = e.touches[0].clientX / width;
+              const y = e.touches[0].clientY / height;
+              const results = XR8.XrController.hitTest(x, y, ['FEATURE_POINT']);
+              if (results.length > 0) {
+                placeModel(results[0].position);
+              }
             } else if (e.touches.length === 2 && placed) {
-              isRotating = true;
-              rotationStartAngle = twoFingerAngle(e.touches);
-              rotationAtGestureStart = arGroup.rotation.y;
+              isTransforming = true;
+              lastAngle = twoFingerAngle(e.touches);
+              lastMidX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+              lastMidY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
             }
           });
 
           pipelineCanvas.addEventListener('touchmove', (e) => {
-            if (!arGroup) return;
-            if (e.touches.length === 2 && placed && isRotating) {
-              const angle = twoFingerAngle(e.touches);
-              arGroup.rotation.y = rotationAtGestureStart + (angle - rotationStartAngle);
-              e.preventDefault(); // stop the page from scrolling/zooming while rotating the model
-              return;
-            }
-            if (e.touches.length === 1 && !placed) {
-              const x = e.touches[0].clientX;
-              const y = e.touches[0].clientY;
-              if (Math.abs(x - touchStartX) > DRAG_THRESHOLD_PX || Math.abs(y - touchStartY) > DRAG_THRESHOLD_PX) {
-                touchMoved = true;
-              }
-            }
+            if (!arGroup || !placed || !isTransforming || e.touches.length !== 2) return;
+
+            const angle = twoFingerAngle(e.touches);
+            const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+            const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+
+            // Rotate: incremental twist delta since the last move event
+            arGroup.rotation.y += (angle - lastAngle);
+
+            // Move: translate along the camera's ground-projected
+            // forward/right axes, so dragging feels correct regardless of
+            // which way the phone is currently facing.
+            const dxScreen = midX - lastMidX;
+            const dyScreen = midY - lastMidY;
+            const cam = XR8.Threejs.xrScene().camera;
+            const forward = new CapturedTHREE.Vector3();
+            cam.getWorldDirection(forward);
+            forward.y = 0;
+            if (forward.lengthSq() > 0.0001) forward.normalize();
+            const right = new CapturedTHREE.Vector3(forward.z, 0, -forward.x); // 90 deg from forward, in the ground plane - flip the signs here if left/right ever feels inverted
+
+            arGroup.position.addScaledVector(right, dxScreen * MOVE_SENSITIVITY);
+            arGroup.position.addScaledVector(forward, -dyScreen * MOVE_SENSITIVITY);
+
+            lastAngle = angle;
+            lastMidX = midX;
+            lastMidY = midY;
+            e.preventDefault(); // stop the page from scrolling/zooming while transforming the model
           }, { passive: false }); // passive: false is required for preventDefault() above to take effect
 
           pipelineCanvas.addEventListener('touchend', (e) => {
-            if (e.touches.length < 2) isRotating = false;
-            if (!placed && !touchMoved && e.touches.length === 0 && surfaceCurrentlyDetected && lastHitPosition) {
-              placeModel(lastHitPosition);
-            }
+            if (e.touches.length < 2) isTransforming = false;
           });
         } catch (err) {
           console.error('[AR] Unexpected error during AR scene setup:', err);
@@ -303,34 +307,6 @@
       },
 
       onUpdate: () => {
-        // --- Continuous (but throttled) surface scan, until the model is
-        // placed. Mirrors main.js's animate()-loop hit-test polling for the
-        // Android/WebXR path (see that file's section 5), but only actually
-        // calls hitTest() every HIT_TEST_INTERVAL_MS - calling it every
-        // single frame was heavy enough to visibly stall the camera feed. ---
-        if (arGroup && !placed) {
-          const now = Date.now();
-          if (now - lastHitTestAt >= HIT_TEST_INTERVAL_MS) {
-            lastHitTestAt = now;
-            const results = XR8.XrController.hitTest(0.5, 0.5, ['FEATURE_POINT']); // center of screen, like aiming a reticle
-            if (results.length > 0) {
-              lastHitPosition = results[0].position;
-              if (!surfaceCurrentlyDetected) {
-                surfaceCurrentlyDetected = true;
-                firstDetectedAt = now;
-                setOverlayText('Hold steady...');
-              } else if (now - firstDetectedAt > AUTO_PLACE_STABILIZE_MS) {
-                placeModel(lastHitPosition);
-              }
-            } else {
-              surfaceCurrentlyDetected = false;
-              firstDetectedAt = null;
-              lastHitPosition = null;
-              setOverlayText('Move your phone to find a surface');
-            }
-          }
-        }
-
         const cfg = window.GANTRY_CONFIG;
         if (!cfg || !jointQuat) return;
         Object.entries(axisStateAR).forEach(([key, state]) => {
