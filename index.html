@@ -91,6 +91,7 @@
     touch events at all - confirmed from 8th Wall's own component docs.
   -->
   <a-scene
+    tap-place
     xrweb="allowedDevices: any"
     xrextras-loading
     xrextras-runtime-error
@@ -119,7 +120,6 @@
       gltf-model="#robot-model"
       scale="3 3 3"
       joint-driver
-      place-on-tap
       xrextras-hold-drag
       -xrextras-two-finger-rotate
       -xrextras-pinch-scale="min: 0.2; max: 3"
