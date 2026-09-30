@@ -3,104 +3,178 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>A-Frame Lesson 1: Basic Scene</title>
+  <title>A-Frame Lesson 2: Driving the Joints</title>
 
-  <!--
-    This is the ONLY script tag you need for plain A-Frame (no AR yet).
-    A-Frame bundles its own three.js internally - you don't add three.js
-    separately here, unlike main.js/ar-iphone.js which both load three.js
-    themselves. This is one of the "different mental model" things we
-    talked about: A-Frame owns its own rendering stack.
-  -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 
   <style>
-    /* Just so the on-screen instructions are readable over the 3D view */
     body { margin: 0; }
     #instructions {
       position: fixed; top: 10px; left: 10px; z-index: 10;
       background: rgba(0,0,0,0.6); color: white; padding: 10px 14px;
       font-family: sans-serif; font-size: 14px; border-radius: 6px;
-      max-width: 300px;
+      max-width: 280px;
     }
+    #sliders {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 10;
+      background: rgba(0,0,0,0.75); color: white;
+      font-family: sans-serif; font-size: 13px;
+      padding: 10px 14px; display: flex; flex-wrap: wrap; gap: 10px;
+    }
+    #sliders label { display: flex; flex-direction: column; width: 110px; }
+    #sliders input { width: 100%; }
   </style>
+
+  <script>
+    // ==========================================
+    // The "joint-driver" component
+    // ==========================================
+    // This is the A-Frame equivalent of main.js's AXIS_CONFIG + axisState +
+    // the rotation math inside animate(). Same underlying idea (rest
+    // orientation * rotation-about-local-axis, smoothed toward a target
+    // angle) - just packaged as a component instead of loose functions.
+    AFRAME.registerComponent('joint-driver', {
+
+      // schema = the component's configurable attributes, like AXIS_CONFIG's
+      // per-joint settings in main.js, but here just one tunable value -
+      // usage in HTML would look like joint-driver="lerpFactor: 0.05"
+      schema: {
+        lerpFactor: { type: 'number', default: 0.05 }
+      },
+
+      // init() runs ONCE, when this component is attached to its entity -
+      // this is where the one-time setup goes, same role as the code
+      // inside main.js's GLTFLoader.load(...) callback.
+      init: function () {
+        // *** MODIFY HERE for a different model/DOF count *** - identical
+        // structure and purpose to main.js's AXIS_CONFIG object.
+        this.axisConfig = {
+          PosA1: { nodeName: 'Degree1', axis: 'y', sign:  1, offset: 0 },
+          PosA2: { nodeName: 'Degree2', axis: 'z', sign:  1, offset: 0 },
+          PosA3: { nodeName: 'Degree3', axis: 'z', sign:  1, offset: 0 },
+          PosA4: { nodeName: 'Degree4', axis: 'x', sign:  1, offset: 0 },
+          PosA5: { nodeName: 'Degree5', axis: 'z', sign: -1, offset: 0 },
+          PosA6: { nodeName: 'Degree6', axis: 'x', sign:  1, offset: 0 }
+        };
+
+        // THREE is available globally here because A-Frame attaches its own
+        // bundled three.js to window.THREE - this is the exact "A-Frame owns
+        // its own THREE instance" point from our earlier conversation. No
+        // import, no CapturedTHREE dance needed - but also no CHOICE about
+        // which three.js version you're using, since A-Frame picks it.
+        this.axisVectors = {
+          x: new THREE.Vector3(1, 0, 0),
+          y: new THREE.Vector3(0, 1, 0),
+          z: new THREE.Vector3(0, 0, 1)
+        };
+
+        this.axisState = {};
+        this.jointQuat = new THREE.Quaternion();
+
+        // Shared "live target angles" object - Stage 3 will replace the
+        // sliders that write into this with real MQTT messages. Same role
+        // as main.js's window.GANTRY_CONFIG.mqttTargets.
+        window.jointTargets = window.jointTargets || {
+          PosA1: 0, PosA2: 0, PosA3: 0, PosA4: 0, PosA5: 0, PosA6: 0
+        };
+
+        // 'model-loaded' fires once gltf-model finishes loading the GLB -
+        // this IS the A-Frame equivalent of the callback you pass to
+        // GLTFLoader.load(...) in main.js section 4. We can't look for the
+        // Degree1..Degree6 nodes until the model has actually finished
+        // loading, same constraint as before.
+        this.el.addEventListener('model-loaded', () => {
+          const mesh = this.el.getObject3D('mesh'); // the loaded THREE.Group - equivalent to gltf.scene in main.js
+          mesh.traverse((child) => {
+            Object.entries(this.axisConfig).forEach(([key, cfg]) => {
+              if (child.name === cfg.nodeName) {
+                this.axisState[key] = {
+                  node: child,
+                  axisVec: this.axisVectors[cfg.axis],
+                  sign: cfg.sign,
+                  offsetRad: THREE.MathUtils.degToRad(cfg.offset || 0),
+                  restQuat: child.quaternion.clone(), // orientation baked into the GLB
+                  current: 0
+                };
+              }
+            });
+          });
+          console.log('[joint-driver] wired axes:', Object.keys(this.axisState));
+        });
+      },
+
+      // tick() runs every frame, automatically - you never call this
+      // yourself, unlike main.js's animate() which you had to pass to
+      // renderer.setAnimationLoop(). Same lerp-toward-target math as before.
+      tick: function () {
+        Object.entries(this.axisState).forEach(([key, st]) => {
+          const target = window.jointTargets[key] || 0;
+          st.current += (target - st.current) * this.data.lerpFactor;
+          const angle = THREE.MathUtils.degToRad(st.current * st.sign) + st.offsetRad;
+          this.jointQuat.setFromAxisAngle(st.axisVec, angle);
+          st.node.quaternion.copy(st.restQuat).multiply(this.jointQuat);
+        });
+      }
+    });
+  </script>
 </head>
 <body>
 
   <div id="instructions">
-    <strong>Lesson 1: Basic A-Frame Scene</strong><br>
-    Click and drag to look around.<br>
-    Scroll to zoom (if your mouse supports it).<br>
-    This is plain A-Frame - no AR, no 8th Wall, just three.js under the hood.
+    <strong>Lesson 2: Driving the Joints</strong><br>
+    Drag the sliders below to rotate each axis - this is standing in for
+    MQTT messages, which we'll wire up in Stage 3.
   </div>
 
-  <!--
-    <a-scene> is the root of everything - it creates the renderer, the
-    render loop, and the default camera/lighting setup, all automatically.
-    Compare this to main.js's section 2, where YOU wrote all of that by
-    hand (new THREE.Scene(), new THREE.WebGLRenderer(), the animation
-    loop, etc). A-Frame does all of that for you the moment this tag exists.
-  -->
   <a-scene>
-
-    <!--
-      <a-assets> preloads things (models, images, sounds) before the scene
-      starts, and lets you reference them by #id elsewhere instead of
-      repeating the URL. Not required, but it's the normal A-Frame pattern -
-      it avoids a model "popping in" after the scene has already rendered.
-    -->
     <a-assets>
-      <!-- *** MODIFY HERE to point at a different GLB, same idea as
-           main.js's MODEL_URL constant *** -->
       <a-asset-item id="robot-model" src="./model/KukaR1300.glb"></a-asset-item>
     </a-assets>
 
     <!--
-      This is the actual robot. gltf-model="#robot-model" is a BUILT-IN
-      A-Frame component - it does exactly what your GLTFLoader.load(...)
-      call does in main.js section 4, just declaratively instead of in JS.
-      No loader code, no onLoad callback to write yourself - A-Frame
-      handles it and adds the loaded model as this entity's Object3D.
+      joint-driver is attached here exactly like gltf-model or position -
+      it's just an attribute now that we registered it above. This one line
+      is doing everything main.js's AXIS_CONFIG + axisState + animate()
+      rotation code does together.
     -->
     <a-entity
       id="robot"
       gltf-model="#robot-model"
-      position="0 0 -2"
-      rotation="0 0 0"
-      scale="1 1 1">
+      joint-driver
+      position="0 0 -2">
     </a-entity>
 
-    <!--
-      A simple ground plane, just so there's something to give the scene
-      spatial scale - equivalent to your floorMesh/gridHelper in main.js.
-    -->
-    <a-plane
-      position="0 0 -2"
-      rotation="-90 0 0"
-      width="10" height="10"
-      color="#dcdcdc">
-    </a-plane>
+    <a-plane position="0 0 -2" rotation="-90 0 0" width="10" height="10" color="#dcdcdc"></a-plane>
 
-    <!--
-      Lights, as declarative entities instead of `new THREE.DirectionalLight(...)`.
-      This directly parallels main.js's keyLight/fillLight/ambientLight -
-      same three underlying THREE.Light types, just written as HTML attributes.
-    -->
     <a-entity light="type: ambient; color: #edf5ff; intensity: 0.5"></a-entity>
     <a-entity light="type: directional; color: #ffffff; intensity: 1.0" position="4 6 4"></a-entity>
     <a-entity light="type: directional; color: #bbe0ff; intensity: 0.5" position="-4 3 -3"></a-entity>
 
-    <!--
-      The camera. A-Frame gives you mouse-drag-to-look and WASD movement
-      for free via the default camera rig - this is standard A-Frame
-      boilerplate for a "look around a 3D scene" page, not something
-      specific to your project.
-    -->
     <a-entity position="0 1.6 0">
       <a-camera></a-camera>
     </a-entity>
-
   </a-scene>
+
+  <!-- Plain HTML sliders - NOT A-Frame entities, just a normal UI overlay,
+       same role as main.js's brightness/angle range inputs. -->
+  <div id="sliders">
+    <label>A1 <input type="range" min="-180" max="180" value="0" data-axis="PosA1"></label>
+    <label>A2 <input type="range" min="-180" max="180" value="0" data-axis="PosA2"></label>
+    <label>A3 <input type="range" min="-180" max="180" value="0" data-axis="PosA3"></label>
+    <label>A4 <input type="range" min="-180" max="180" value="0" data-axis="PosA4"></label>
+    <label>A5 <input type="range" min="-180" max="180" value="0" data-axis="PosA5"></label>
+    <label>A6 <input type="range" min="-180" max="180" value="0" data-axis="PosA6"></label>
+  </div>
+
+  <script>
+    document.querySelectorAll('#sliders input').forEach((input) => {
+      input.addEventListener('input', (e) => {
+        const axis = e.target.dataset.axis;
+        window.jointTargets = window.jointTargets || {};
+        window.jointTargets[axis] = parseFloat(e.target.value);
+      });
+    });
+  </script>
 
 </body>
 </html>
