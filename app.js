@@ -110,6 +110,7 @@ AFRAME.registerComponent('place-on-tap', {
     // so we wait for the scene's own 'renderstart' event, same reasoning as
     // ar-iphone.js's onStart pattern (don't touch the canvas before it exists).
     this.el.sceneEl.addEventListener('renderstart', () => {
+      console.log('[place-on-tap] canvas ready, listening for clicks/taps');
       const canvas = this.el.sceneEl.canvas;
 
       // Handles both a real device (touchstart) and 8th Wall's desktop
@@ -117,6 +118,7 @@ AFRAME.registerComponent('place-on-tap', {
       // touch events carry coordinates in e.touches[0], mouse events carry
       // them directly on the event.
       const handlePlacementInput = (e) => {
+        console.log('[place-on-tap] input received. placed:', this.placed, 'window.XR8:', !!window.XR8);
         if (this.placed || !window.XR8) return;
 
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
@@ -124,12 +126,14 @@ AFRAME.registerComponent('place-on-tap', {
         const x = clientX / canvas.clientWidth;
         const y = clientY / canvas.clientHeight;
         const results = XR8.XrController.hitTest(x, y, ['FEATURE_POINT']);
+        console.log('[place-on-tap] hitTest at', x.toFixed(2), y.toFixed(2), '-> results:', results.length, results);
 
         if (results.length > 0) {
           const { position } = results[0];
           this.el.setAttribute('position', position);
           this.el.setAttribute('visible', true);
           this.placed = true;
+          console.log('[place-on-tap] PLACED at', position);
 
           const groundEl = document.getElementById('ground');
           if (groundEl) {
