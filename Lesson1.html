@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>A-Frame Lesson 1: Basic Scene</title>
+
+  <!--
+    This is the ONLY script tag you need for plain A-Frame (no AR yet).
+    A-Frame bundles its own three.js internally - you don't add three.js
+    separately here, unlike main.js/ar-iphone.js which both load three.js
+    themselves. This is one of the "different mental model" things we
+    talked about: A-Frame owns its own rendering stack.
+  -->
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+
+  <style>
+    /* Just so the on-screen instructions are readable over the 3D view */
+    body { margin: 0; }
+    #instructions {
+      position: fixed; top: 10px; left: 10px; z-index: 10;
+      background: rgba(0,0,0,0.6); color: white; padding: 10px 14px;
+      font-family: sans-serif; font-size: 14px; border-radius: 6px;
+      max-width: 300px;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="instructions">
+    <strong>Lesson 1: Basic A-Frame Scene</strong><br>
+    Click and drag to look around.<br>
+    Scroll to zoom (if your mouse supports it).<br>
+    This is plain A-Frame - no AR, no 8th Wall, just three.js under the hood.
+  </div>
+
+  <!--
+    <a-scene> is the root of everything - it creates the renderer, the
+    render loop, and the default camera/lighting setup, all automatically.
+    Compare this to main.js's section 2, where YOU wrote all of that by
+    hand (new THREE.Scene(), new THREE.WebGLRenderer(), the animation
+    loop, etc). A-Frame does all of that for you the moment this tag exists.
+  -->
+  <a-scene>
+
+    <!--
+      <a-assets> preloads things (models, images, sounds) before the scene
+      starts, and lets you reference them by #id elsewhere instead of
+      repeating the URL. Not required, but it's the normal A-Frame pattern -
+      it avoids a model "popping in" after the scene has already rendered.
+    -->
+    <a-assets>
+      <!-- *** MODIFY HERE to point at a different GLB, same idea as
+           main.js's MODEL_URL constant *** -->
+      <a-asset-item id="robot-model" src="./model/KukaR1300.glb"></a-asset-item>
+    </a-assets>
+
+    <!--
+      This is the actual robot. gltf-model="#robot-model" is a BUILT-IN
+      A-Frame component - it does exactly what your GLTFLoader.load(...)
+      call does in main.js section 4, just declaratively instead of in JS.
+      No loader code, no onLoad callback to write yourself - A-Frame
+      handles it and adds the loaded model as this entity's Object3D.
+    -->
+    <a-entity
+      id="robot"
+      gltf-model="#robot-model"
+      position="0 0 -2"
+      rotation="0 0 0"
+      scale="1 1 1">
+    </a-entity>
+
+    <!--
+      A simple ground plane, just so there's something to give the scene
+      spatial scale - equivalent to your floorMesh/gridHelper in main.js.
+    -->
+    <a-plane
+      position="0 0 -2"
+      rotation="-90 0 0"
+      width="10" height="10"
+      color="#dcdcdc">
+    </a-plane>
+
+    <!--
+      Lights, as declarative entities instead of `new THREE.DirectionalLight(...)`.
+      This directly parallels main.js's keyLight/fillLight/ambientLight -
+      same three underlying THREE.Light types, just written as HTML attributes.
+    -->
+    <a-entity light="type: ambient; color: #edf5ff; intensity: 0.5"></a-entity>
+    <a-entity light="type: directional; color: #ffffff; intensity: 1.0" position="4 6 4"></a-entity>
+    <a-entity light="type: directional; color: #bbe0ff; intensity: 0.5" position="-4 3 -3"></a-entity>
+
+    <!--
+      The camera. A-Frame gives you mouse-drag-to-look and WASD movement
+      for free via the default camera rig - this is standard A-Frame
+      boilerplate for a "look around a 3D scene" page, not something
+      specific to your project.
+    -->
+    <a-entity position="0 1.6 0">
+      <a-camera></a-camera>
+    </a-entity>
+
+  </a-scene>
+
+</body>
+</html>
