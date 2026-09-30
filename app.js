@@ -112,11 +112,17 @@ AFRAME.registerComponent('place-on-tap', {
     this.el.sceneEl.addEventListener('renderstart', () => {
       const canvas = this.el.sceneEl.canvas;
 
-      canvas.addEventListener('touchstart', (e) => {
+      // Handles both a real device (touchstart) and 8th Wall's desktop
+      // simulator (mousedown, since there's no touchscreen on desktop) -
+      // touch events carry coordinates in e.touches[0], mouse events carry
+      // them directly on the event.
+      const handlePlacementInput = (e) => {
         if (this.placed || !window.XR8) return;
 
-        const x = e.touches[0].clientX / canvas.clientWidth;
-        const y = e.touches[0].clientY / canvas.clientHeight;
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        const x = clientX / canvas.clientWidth;
+        const y = clientY / canvas.clientHeight;
         const results = XR8.XrController.hitTest(x, y, ['FEATURE_POINT']);
 
         if (results.length > 0) {
@@ -134,7 +140,10 @@ AFRAME.registerComponent('place-on-tap', {
           const overlay = document.getElementById('ar-scan-overlay');
           if (overlay) overlay.style.display = 'none';
         }
-      });
+      };
+
+      canvas.addEventListener('touchstart', handlePlacementInput);
+      canvas.addEventListener('mousedown', handlePlacementInput);
     });
   }
 });
