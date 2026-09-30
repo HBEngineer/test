@@ -135,11 +135,12 @@ AFRAME.registerComponent('place-on-tap', {
           this.placed = true;
           console.log('[place-on-tap] PLACED at', position);
 
-          const groundEl = document.getElementById('ground');
-          if (groundEl) {
-            groundEl.setAttribute('position', { x: position.x, y: position.y, z: position.z });
-            groundEl.setAttribute('visible', true);
-          }
+          // NOT revealing #ground here (unlike an earlier version of this
+          // file) - it's a big opaque plane meant only as a visual floor
+          // reference for desktop preview, where there's no real camera
+          // feed. On a real device it just covers the actual floor under
+          // the camera passthrough, which is exactly the "white floor"
+          // problem - so it stays invisible in real AR.
 
           const overlay = document.getElementById('ar-scan-overlay');
           if (overlay) overlay.style.display = 'none';

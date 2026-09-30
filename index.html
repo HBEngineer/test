@@ -121,9 +121,13 @@
       place-on-tap
       xrextras-hold-drag="cameraId: camera"
       xrextras-two-finger-rotate
+      xrextras-pinch-scale="min: 0.2; max: 3"
       visible="false">
     </a-entity>
 
+    <!-- Kept invisible permanently now - see place-on-tap's comment in
+         app.js for why. Still here in case a future desktop-preview mode
+         wants a visual floor reference again. -->
     <a-plane id="ground" position="0 0 -2" rotation="-90 0 0" width="10" height="10" color="#dcdcdc" visible="false"></a-plane>
 
     <!-- Lights as entities, with ids so app.js's brightness slider can
