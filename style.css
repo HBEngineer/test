@@ -1,0 +1,228 @@
+* * {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: #2b2b2b;
+  color: #ffffff;
+  overflow: hidden;
+  width: 100vw;
+  height: 100vh;
+}
+
+#canvas-container {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+}
+
+/* Overlay Panels */
+.panel {
+  position: absolute;
+  z-index: 10;
+  background: rgba(30, 30, 30, 0.85);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+#status-panel {
+  top: 20px;
+  left: 20px;
+  min-width: 220px;
+}
+
+.status-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  font-weight: 600;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #aaa;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #ff5252;
+  box-shadow: 0 0 10px #ff5252;
+  transition: background-color 0.3s, box-shadow 0.3s;
+}
+
+.telemetry-row {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 14px;
+  font-family: monospace;
+}
+
+.telemetry-label {
+  color: #888;
+}
+
+.telemetry-val {
+  color: #4caf50;
+  font-weight: bold;
+}
+
+/* Lighting Control Panel */
+#light-panel {
+  top: 20px;
+  right: 20px;
+  width: 260px;
+  transition: all 0.3s ease;
+}
+
+.panel-header {
+  font-weight: 600;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #aaa;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* CSS Pure Triangle Arrow (Fixes ? encoding issues) */
+.arrow-icon {
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 7px solid #aaa;
+  transition: transform 0.3s ease;
+}
+
+#light-panel.collapsed .arrow-icon {
+  transform: rotate(180deg);
+}
+
+#light-panel.collapsed .panel-body {
+  display: none;
+}
+
+.panel-body {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.control-group label {
+  font-size: 13px;
+  color: #ccc;
+  display: flex;
+  justify-content: space-between;
+}
+
+.control-group input[type="range"] {
+  width: 100%;
+  accent-color: #2196f3;
+  cursor: pointer;
+}
+
+#ar-scan-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 20;
+  background: rgba(0, 0, 0, 0.75);
+  padding: 16px 24px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-size: 15px;
+  pointer-events: none;
+  display: none;
+  text-align: center;
+}
+
+#ar-scan-overlay.visible {
+  display: block;
+}
+/* iPhone Live AR (8th Wall) - additive, does not modify existing rules */
+.ios-ar-button {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 999;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 20px;
+  background: rgba(0, 145, 255, 0.9);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  display: none;
+}
+
+#camerafeed {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  touch-action: none;
+  z-index: 2000;
+}
+
+.ar-scan-overlay {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  right: 20px;
+  z-index: 2001;
+  display: none;
+  justify-content: center;
+}
+.ar-scan-overlay.visible { display: flex; }
+.ar-scan-card {
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  text-align: center;
+}
+
+.ios-ar-exit-button {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 2002;
+  padding: 10px 18px;
+  border: none;
+  border-radius: 20px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
