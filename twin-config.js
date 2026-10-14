@@ -16,7 +16,6 @@
 //   4. Edit the  axes  list (section 4): one entry per moving part/variable.
 //   5. Set the MQTT broker, credentials and topic (section 3) and make the
 //      payload JSON keys match the  payloadKey  of each axis.
-//  (c) Hugo Ben - 2026 
 // ============================================================================
 
 window.TWIN_CONFIG = {
@@ -76,7 +75,7 @@ window.TWIN_CONFIG = {
     { key: 'PosZ', label: 'Z Axis', node: 'Slide_Z', type: 'position', axis: 'y', sign: -1 }
 
     // Example of a rotary joint (6-axis robot style):
-    // { key: 'J1', label: 'Joint 1', node: 'Link_1', type: 'rotation', axis: 'y', sign: 1 },
+    // { key: 'J1', label: 'Joint 1', payloadKey: 'j1', node: 'Link_1', type: 'rotation', axis: 'y', sign: 1 },
   ],
 
   // --------------------------------------------------------------------------
@@ -115,7 +114,55 @@ window.TWIN_CONFIG = {
 
     // Separate intensities for the iPhone 8th Wall scene (it uses its own THREE instance)
     iosAR: {
-      hemi: 2, key: 2, fill: 1.5, ambient: 1, camera: 3
+      hemi: 1, key: 1.0, fill: 0.5, ambient: 0.5, camera: 2
     }
+  },
+
+  // --------------------------------------------------------------------------
+  // 8. AUGMENTED REALITY (iPhone live AR with 8th Wall)
+  // --------------------------------------------------------------------------
+  //  Works without any marker: the user scans the floor and taps to place the
+  //  model. Markers (optional) place it at an exact spot and re-anchor it
+  //  every time one is seen, which removes drift.
+  ar: {
+    // 'responsive' = relative scale (default 8th Wall behaviour).
+    // 'absolute'   = scene units are real metres. Use it for a model that must
+    //                appear at real size (e.g. 2 m x 3 m). It needs a little
+    //                phone movement before the scale is known. Try both.
+    scale: 'responsive',
+
+    // Placement without markers (tap on the floor)
+    placement: {
+      stabilizeMs: 800,        // tracking must be "normal" this long before a tap places the model
+      groundOnly: true,        // true = put the model on the floor plane (stable height)
+      facing: 'camera',        // 'camera' = model faces you when placed, 'world' = fixed
+      yawOffsetDeg: 0          // extra rotation about the vertical axis (degrees)
+    },
+
+    // Marker behaviour (only used if markers are listed below)
+    markerOptions: {
+      smoothing: 0.15,         // 0..1, lower = smoother follow (less trembling)
+      keepUpright: true,       // true = use only the marker's heading, ignore its tilt
+      deadbandM: 0.005,        // ignore marker movements smaller than this (metres)
+      deadbandDeg: 0.5         // ignore marker rotations smaller than this (degrees)
+    },
+
+    // MARKERS (add 1 to 4, or leave the list empty to use tap-to-place only)
+    //  name        Must match the "name" inside the target .json file.
+    //  targetJson  Path to the image-target .json made by the 8th Wall
+    //              Image Target Processor (see the guide).
+    //  widthM      REAL printed width of the marker in metres (measure it!).
+    //  position    Where the CENTRE of the marker is, in the MODEL frame, metres
+    //              [x, y, z], measured from the model origin.
+    //  rotationDeg Orientation of the marker in the model frame, degrees
+    //              [x, y, z]. Turn on  debug  below to see the axes and adjust.
+    markers: [
+      // { name: 'marker-front', targetJson: './markers/marker-front.json',
+      //   widthM: 0.42, position: [0, 0.8, 1.5], rotationDeg: [0, 0, 0] },
+      // { name: 'marker-side',  targetJson: './markers/marker-side.json',
+      //   widthM: 0.42, position: [1.0, 0.8, 0], rotationDeg: [0, 90, 0] }
+    ],
+
+    debug: false               // true = draw small axes at each marker position on the model
   }
 };

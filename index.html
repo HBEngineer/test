@@ -3,7 +3,6 @@
      index.html   >>>  NO MODIFICATION NEEDED  <<<
      The title, telemetry rows (axes) and model are all driven by twin-config.js.
      Script ORDER at the bottom matters: config -> shared -> main -> ar-iphone.
-     (c) Hugo Ben - 2026 
      ============================================================================ -->
 <html lang="en">
 <head>
@@ -62,6 +61,8 @@
     </div>
   </div>
   <button id="ios-ar-exit-btn" class="ios-ar-exit-button" style="display: none;">Exit AR</button>
+  <!-- Re-scan: recenters tracking and lets you place the model again -->
+  <button id="ios-ar-rescan-btn" class="ios-ar-exit-button" style="display: none; top: auto; bottom: 20px; right: 20px;">Re-scan</button>
 
   <script>
     const __isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
