@@ -1,150 +1,74 @@
 <!DOCTYPE html>
+<!-- ============================================================================
+     index.html   >>>  NO MODIFICATION NEEDED  <<<
+     The title, telemetry rows (axes) and model are all driven by twin-config.js.
+     Script ORDER at the bottom matters: config -> shared -> main -> ar-iphone.
+     (c) Hugo Ben - 2026 
+     ============================================================================ -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <title>Robot Digital Twin (A-Frame)</title>
+  <title>Digital Twin</title><!-- replaced at runtime by appTitle in twin-config.js -->
 
   <link rel="shortcut icon" href="./favicon.ico" />
-  <!-- Reusing your existing stylesheet - the panel/telemetry class names
-       below match main.js's index.html exactly, so nothing here needs a
-       new stylesheet as long as style.css stays where it is. -->
   <link rel="stylesheet" href="./style.css" />
 
-  <!--
-    8th Wall's modified A-Frame build ("8Frame"). Per 8th Wall's own docs,
-    self-hosted A-Frame projects should use this instead of plain A-Frame
-    from aframe.io - it "improves AFrame's compatibility with XR8" (their
-    wording). Lessons 1-2 used plain A-Frame because they never touched
-    the AR engine; now that we do, this is the documented choice.
-  -->
-  <script src="//cdn.8thwall.com/web/aframe/8frame-1.4.1.min.js"></script>
-
-  <!-- Same engine-binary scripts your existing project already uses -
-       unchanged, since they're already proven working on your setup. -->
-  <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@8thwall/xrextras@1/dist/xrextras.js" crossorigin="anonymous"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
 
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
-  <!-- Our own component code - joint-driver, MQTT wiring, tap-to-place,
-       lighting sliders. Loaded as a classic (non-module) script since
-       A-Frame components register onto the global AFRAME object. -->
-  <script src="./app.js" defer></script>
+  <!-- iPhone AR (8th Wall) - separate classic/global THREE instance -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="./gltfloader-classic.js" onerror="window.__gltfScriptFailed = true" onload="window.__gltfScriptLoaded = true"></script>
+  <script>window.__CAPTURED_THREE__ = window.THREE; window.__CAPTURED_GLTFLOADER__ = window.THREE && window.THREE.GLTFLoader;</script>
+  <script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js" async crossorigin="anonymous" data-preload-chunks="slam"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@8thwall/xrextras@1/dist/xrextras.js" crossorigin="anonymous"></script>
+
+  <!-- Project config + shared logic (classic scripts, must run before main.js) -->
+  <script src="./twin-config.js"></script>
+  <script src="./twin-shared.js"></script>
 </head>
 <body>
 
-  <!-- ========================================== -->
-  <!-- STATUS / TELEMETRY PANEL (same structure & class names as your -->
-  <!-- existing index.html, so style.css keeps working unchanged) -->
-  <!-- ========================================== -->
+  <div id="canvas-container"></div>
+
+  <!-- Status + telemetry. Rows are generated automatically from CONFIG.axes -->
   <div id="status-panel" class="panel">
     <div class="status-header">
       <div id="dot" class="dot"></div>
       <span id="status">Connecting...</span>
     </div>
-    <div class="telemetry-row"><span class="telemetry-label">Axis A1:</span><span id="val-a1" class="telemetry-val">0.0 °</span></div>
-    <div class="telemetry-row"><span class="telemetry-label">Axis A2:</span><span id="val-a2" class="telemetry-val">0.0 °</span></div>
-    <div class="telemetry-row"><span class="telemetry-label">Axis A3:</span><span id="val-a3" class="telemetry-val">0.0 °</span></div>
-    <div class="telemetry-row"><span class="telemetry-label">Axis A4:</span><span id="val-a4" class="telemetry-val">0.0 °</span></div>
-    <div class="telemetry-row"><span class="telemetry-label">Axis A5:</span><span id="val-a5" class="telemetry-val">0.0 °</span></div>
-    <div class="telemetry-row"><span class="telemetry-label">Axis A6:</span><span id="val-a6" class="telemetry-val">0.0 °</span></div>
-  </div>
-
-  <!-- Lighting panel - same idea as before, but now the slider handler in
-       app.js sets A-Frame light entities' attributes instead of THREE
-       light objects directly. -->
-  <div id="light-panel" class="panel collapsed">
-    <div id="light-panel-header" class="panel-header">
-      <span>Lighting</span>
-      <span class="arrow-icon"></span>
-    </div>
-    <div class="panel-body">
-      <div class="control-group">
-        <label for="ctrl-brightness">Master Brightness <span id="lbl-brightness">100%</span></label>
-        <input type="range" id="ctrl-brightness" min="0.2" max="2.0" step="0.1" value="1.0">
-      </div>
-    </div>
+    <div id="telemetry-rows"></div>
   </div>
 
   <div id="ar-scan-overlay">
-    <span id="ar-scan-text">Move your phone to find a surface, then tap it.</span>
+    <span id="ar-scan-text">Scan surface...</span>
   </div>
 
-  <!--
-    ========================================== 
-    THE A-FRAME SCENE ITSELF
-    ==========================================
-    xrweb: turns this into an 8th Wall AR scene - handles camera
-    passthrough, world tracking, and (per 8th Wall's standard behavior)
-    falls back to a normal orbit-able 3D preview on desktop, where there's
-    no AR camera to use. That fallback is what let Lessons 1-2 "just work"
-    as plain 3D viewers - same mechanism, just automatic now.
+  <!-- iOS Live AR (8th Wall) -->
+  <button id="ios-live-ar-btn" class="ios-ar-button" style="display:none;">Start Live AR (Beta)</button>
+  <canvas id="camerafeed" style="display: none;"></canvas>
+  <div id="ios-ar-scan-overlay" class="ar-scan-overlay">
+    <div class="ar-scan-card">
+      <div id="ios-ar-scan-text">Starting AR...</div>
+    </div>
+  </div>
+  <button id="ios-ar-exit-btn" class="ios-ar-exit-button" style="display: none;">Exit AR</button>
 
-    xrextras-loading / xrextras-runtime-error: standard 8th Wall loading
-    screen and error handling - equivalent to things your current project
-    handles by hand (the ar-scan-overlay show/hide logic, error console
-    logging) but provided out of the box here.
+  <script>
+    const __isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    if (__isIOS) document.getElementById('ios-live-ar-btn').style.display = 'flex';
+  </script>
 
-    xrextras-gesture-detector: REQUIRED for xrextras-hold-drag and
-    xrextras-two-finger-rotate (used below on the robot entity) to receive
-    touch events at all - confirmed from 8th Wall's own component docs.
-  -->
-  <a-scene
-    tap-place
-    xrweb="allowedDevices: any"
-    xrextras-loading
-    xrextras-runtime-error
-    xrextras-gesture-detector>
-
-    <a-assets>
-      <!-- *** MODIFY HERE for a different model, same idea as MODEL_URL in main.js *** -->
-      <a-asset-item id="robot-model" src="./model/KukaR1300.glb"></a-asset-item>
-    </a-assets>
-
-    <!--
-      The robot entity. Five components stacked on one tag:
-        gltf-model     - loads the GLB (built into A-Frame)
-        joint-driver   - OUR component, rotates the 6 joints (see app.js)
-        place-on-tap   - OUR component, tap-to-place via XR8 hit-testing
-                         (see app.js) - same logic you already validated
-                         working in ar-iphone.js, just ported into A-Frame's
-                         component pattern
-        xrextras-hold-drag        - 8th Wall's component: press & drag to move
-        xrextras-two-finger-rotate - 8th Wall's component: two-finger drag to rotate
-      visible="false" until place-on-tap reveals it, same as arGroup.visible
-      in your old ar-iphone.js.
-    -->
-    <a-entity
-      id="robot"
-      gltf-model="#robot-model"
-      scale="3 3 3"
-      joint-driver
-      xrextras-hold-drag
-      -xrextras-two-finger-rotate
-      -xrextras-pinch-scale="min: 0.2; max: 3"
-      visible="false">
-    </a-entity>
-
-    <!-- Kept invisible permanently now - see place-on-tap's comment in
-         app.js for why. Still here in case a future desktop-preview mode
-         wants a visual floor reference again. -->
-    <a-plane id="ground" position="0 0 -2" rotation="-90 0 0" width="10" height="10" color="#dcdcdc" visible="false"></a-plane>
-
-    <!-- Lights as entities, with ids so app.js's brightness slider can
-         reach them - same three lights as main.js's keyLight/fillLight/ambientLight,
-         minus the hemisphere/camera-follow lights, left out to keep this
-         build's scope focused on the core concepts rather than 1:1
-         matching every lighting detail from the original. -->
-    <a-entity id="ambientLight" light="type: ambient; color: #edf5ff; intensity: 0.5"></a-entity>
-    <a-entity id="keyLight" light="type: directional; color: #ffffff; intensity: 1.0" position="4 6 4"></a-entity>
-    <a-entity id="fillLight" light="type: directional; color: #bbe0ff; intensity: 0.5" position="-4 3 -3"></a-entity>
-
-    <a-entity position="0 1.6 0">
-      <a-camera id="camera"></a-camera>
-    </a-entity>
-
-  </a-scene>
-
+  <script type="module" src="./main.js"></script>
+  <script src="./ar-iphone.js" defer></script>
 </body>
 </html>
