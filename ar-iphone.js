@@ -41,6 +41,7 @@
 
   // ---- AR settings (twin-config.js > ar), with safe defaults ----
   const AR = CFG.ar || {};
+  const HIT_TYPES = ['FEATURE_POINT', 'ESTIMATED_SURFACE', 'DETECTED_SURFACE']; // all kinds of result the engine can return
   const P = Object.assign({
     stabilizeMs: 800,
     groundOnly: false,        // false = use the tapped point's own height (as before)
@@ -322,7 +323,7 @@
       if ((++frameCount % Math.max(1, RT.everyNFrames)) !== 0) return;
 
       let results = [];
-      try { results = XR8.XrController.hitTest(0.5, 0.5, ['FEATURE_POINT']) || []; } catch (e) { results = []; }
+      try { results = XR8.XrController.hitTest(0.5, 0.5, HIT_TYPES) || []; } catch (e) { results = []; }
       const surf = results.find((h) => h.type === 'DETECTED_SURFACE' || h.type === 'ESTIMATED_SURFACE');
       const hit = surf || results[0] || null;
       lastCenterHit = hit;
@@ -532,7 +533,7 @@
             const results = XR8.XrController.hitTest(
               e.touches[0].clientX / width,
               e.touches[0].clientY / height,
-              ['FEATURE_POINT']
+              HIT_TYPES
             );
             const hit = pickHit(results);
             if (!hit) {
