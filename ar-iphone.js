@@ -43,10 +43,10 @@
   const AR = CFG.ar || {};
   const P = Object.assign({
     stabilizeMs: 800,
-    groundOnly: true,
-    facing: 'camera',
+    groundOnly: false,        // false = use the tapped point's own height (as before)
+    facing: 'world',          // 'world' = no extra rotation (as before)
     yawOffsetDeg: 0,
-    preferTypes: ['DETECTED_SURFACE', 'ESTIMATED_SURFACE', 'FEATURE_POINT']
+    preferSurfaces: false     // false = use the first hit-test result (as before)
   }, AR.placement);
   const MK = Object.assign({
     smoothing: 0.15,
@@ -177,7 +177,8 @@
     // ---- Choose the best hit-test result (surface types beat raw feature points) ----
     function pickHit(results) {
       if (!results || results.length === 0) return null;
-      for (const type of P.preferTypes) {
+      if (!P.preferSurfaces) return results[0]; // same as the original behaviour
+      for (const type of ['DETECTED_SURFACE', 'ESTIMATED_SURFACE', 'FEATURE_POINT']) {
         const hit = results.find((h) => h.type === type);
         if (hit) return hit;
       }
@@ -188,7 +189,9 @@
     function placeAt(hit) {
       const x = hit.position.x;
       const z = hit.position.z;
-      const y = P.groundOnly ? 0 : hit.position.y; // 8th Wall's floor is the Y = 0 plane
+      // The scene origin is where the camera started, so the floor is NOT necessarily at y = 0.
+      // Forcing y = 0 (groundOnly) can put the model at eye level, so it is off by default.
+      const y = P.groundOnly ? 0 : hit.position.y;
 
       arGroup.scale.setScalar(1);
       arGroup.position.set(x, y, z);
@@ -468,7 +471,8 @@
 
     const startEngine = () => {
       // Must be configured BEFORE the engine runs
-      const xrConfig = { scale: AR.scale || 'responsive' };
+      const xrConfig = {};
+      if (AR.scale && AR.scale !== 'responsive') xrConfig.scale = AR.scale;
       if (markerData.length > 0) {
         xrConfig.imageTargetData = markerData.map((m) => m.json);
         // Targets flagged loadAutomatically in their json start by themselves;
@@ -476,7 +480,7 @@
         const manual = markerData.filter((m) => !m.json.loadAutomatically).map((m) => m.name);
         if (manual.length > 0) xrConfig.imageTargets = manual;
       }
-      XR8.XrController.configure(xrConfig);
+      if (Object.keys(xrConfig).length > 0) XR8.XrController.configure(xrConfig);
 
       if (!modulesAdded) {
         XR8.addCameraPipelineModules([

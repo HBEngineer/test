@@ -131,12 +131,16 @@ window.TWIN_CONFIG = {
     //                phone movement before the scale is known. Try both.
     scale: 'responsive',
 
-    // Placement without markers (tap on the floor)
+    // Placement without markers (tap on the floor).
+    // Defaults reproduce the ORIGINAL placement. Turn the options on ONE AT A TIME
+    // to see which one helps on your phone.
     placement: {
       stabilizeMs: 800,        // tracking must be "normal" this long before a tap places the model
-      groundOnly: true,        // true = put the model on the floor plane (stable height)
-      facing: 'camera',        // 'camera' = model faces you when placed, 'world' = fixed
-      yawOffsetDeg: 0          // extra rotation about the vertical axis (degrees)
+      groundOnly: false,       // true = force the model height to 0. RISKY: the scene origin is where
+                               //        the camera started, so 0 may be at eye level.
+      facing: 'world',         // 'camera' = model faces you when placed, 'world' = no extra rotation
+      yawOffsetDeg: 0,         // extra rotation about the vertical axis (degrees)
+      preferSurfaces: false    // true = prefer detected/estimated surface hits over raw feature points
     },
 
     // Marker behaviour (only used if markers are listed below)
