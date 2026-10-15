@@ -140,6 +140,7 @@
     let reticle = null;          // circle drawn on the detected surface
     let lastCenterHit = null;    // latest hit-test result at the screen centre
     let frameCount = 0;
+    let baseShiftY = 0;          // how far the model was lowered so its base sits at Y = 0
     const visible = new Map();   // markers currently in view: name -> { m, d }
 
     const nowMs = () => performance.now();
@@ -238,7 +239,8 @@
         const f = new T.Vector3(0, 0, 1).applyQuaternion(qg);
         qg = new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), Math.atan2(f.x, f.z));
       }
-      const pg = pw.clone().sub(m.pos.clone().applyQuaternion(qg).multiplyScalar(s));
+      const mp = m.pos.clone().add(new T.Vector3(0, baseShiftY, 0)); // marker position in the group frame
+      const pg = pw.clone().sub(mp.applyQuaternion(qg).multiplyScalar(s));
       return { pos: pg, quat: qg, scale: s };
     }
 
@@ -367,6 +369,7 @@
 
           // Reset per-session state (the module object is reused between sessions)
           axisStateAR = {};
+          baseShiftY = 0;
           modelLoaded = false;
           placed = false;
           anchored = false;
@@ -381,6 +384,18 @@
           const xr = XR8.Threejs.xrScene();
           const scene = xr.scene;
           arCamera = xr.camera;
+
+          // 8th Wall requires the camera to start at a height GREATER than zero; at zero the
+          // content follows the phone instead of staying on the floor. The starting height also
+          // sets the scale of the scene (lower = bigger content).
+          const camH = (AR.cameraHeight !== undefined) ? AR.cameraHeight : 1.5;
+          arCamera.position.set(0, camH, 0);
+          try {
+            XR8.XrController.updateCameraProjectionMatrix({
+              origin: { x: 0, y: camH, z: 0 },
+              facing: { w: 1, x: 0, y: 0, z: 0 }
+            });
+          } catch (e) { console.warn('[AR] updateCameraProjectionMatrix failed:', e); }
           const L = CFG.lighting;
           const A = L.iosAR;
 
@@ -419,16 +434,6 @@
           lastCenterHit = null;
           frameCount = 0;
 
-          // Debug: draw axes where the config says each marker sits on the model
-          if (AR.debug) {
-            markerData.forEach((m) => {
-              const axes = new T.AxesHelper(0.25);
-              axes.position.copy(m.pos);
-              axes.quaternion.copy(m.quat);
-              arGroup.add(axes);
-            });
-          }
-
           resetPlacementFn = resetPlacement;
 
           setOverlayText('Loading model...');
@@ -449,6 +454,28 @@
               const model = gltf.scene;
               model.scale.setScalar(CFG.model.scale);
               axisStateAR = Shared.bindAxes(model);
+
+              // The model's lowest point must sit at Y = 0 (the detected floor), otherwise
+              // it appears to float or sink and does not look anchored.
+              baseShiftY = 0;
+              if (AR.alignModelBase !== false) {
+                const box = new T.Box3().setFromObject(model);
+                if (isFinite(box.min.y)) {
+                  baseShiftY = -box.min.y;
+                  model.position.y += baseShiftY;
+                }
+              }
+
+              // Debug: axes where the config says each marker sits on the model
+              if (AR.debug) {
+                markerData.forEach((m) => {
+                  const axes = new T.AxesHelper(0.25);
+                  axes.position.copy(m.pos);   // model frame: follows the base shift automatically
+                  axes.quaternion.copy(m.quat);
+                  model.add(axes);
+                });
+              }
+
               arGroup.add(model);
               modelLoaded = true;
               refreshOverlay();

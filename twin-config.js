@@ -125,6 +125,16 @@ window.TWIN_CONFIG = {
   //  model. Markers (optional) place it at an exact spot and re-anchor it
   //  every time one is seen, which removes drift.
   ar: {
+    // Camera starting height (units). MUST be greater than 0, otherwise the model follows the
+    // phone instead of staying on the floor. It also sets the scene scale in 'responsive' mode:
+    // about the real height you hold the phone at (1.4 - 1.6) gives roughly real-size models;
+    // a lower value makes the model look bigger, a higher value smaller.
+    cameraHeight: 1.5,
+
+    // true = lower the model so its lowest point sits exactly on the floor (Y = 0).
+    // Marker positions below stay measured from the model's ORIGINAL origin.
+    alignModelBase: true,
+
     // 'responsive' = relative scale (default 8th Wall behaviour).
     // 'absolute'   = scene units are real metres. Use it for a model that must
     //                appear at real size (e.g. 2 m x 3 m). It needs a little
