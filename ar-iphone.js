@@ -156,6 +156,7 @@
     let reticle = null;          // circle drawn on the detected surface
     let lastCenterHit = null;    // latest hit-test result at the screen centre
     let frameCount = 0;
+    const hitHistory = [];       // recent centre hits, used to judge whether the point is steady
     let baseShiftY = 0;          // how far the model was lowered so its base sits at Y = 0
     const visible = new Map();   // markers currently in view: name -> { m, d }
 
@@ -331,17 +332,37 @@
       if (!hit) {
         reticle.visible = false;
         setCross('#ff3333', true);
+        hitHistory.length = 0;
         setInfo(`Tracking: ${trackingStatus} | no surface at the centre yet - move slowly`);
         return;
       }
+      // This engine usually returns only feature points, so "surface found" is judged here:
+      //  GREEN  = engine reports a surface, OR the point is (a) steady over the last few samples
+      //           and (b) lies at floor height. The scene origin is the camera's starting point
+      //           'cameraHeight' above the floor, so the floor is at y = 0.
+      const dist = hit.distance || arCamera.position.distanceTo(
+        new T.Vector3(hit.position.x, hit.position.y, hit.position.z));
+      hitHistory.push({ x: hit.position.x, y: hit.position.y, z: hit.position.z });
+      if (hitHistory.length > 8) hitHistory.shift();
+      let spread = Infinity;
+      if (hitHistory.length >= 5) {
+        const mean = hitHistory.reduce((a, h) => ({ x: a.x + h.x, y: a.y + h.y, z: a.z + h.z }), { x: 0, y: 0, z: 0 });
+        mean.x /= hitHistory.length; mean.y /= hitHistory.length; mean.z /= hitHistory.length;
+        spread = Math.max(...hitHistory.map((h) => Math.hypot(h.x - mean.x, h.y - mean.y, h.z - mean.z)));
+      }
+      const camH = (AR.cameraHeight !== undefined) ? AR.cameraHeight : 1.5;
+      const steady = spread < 0.05 * Math.max(dist, 0.5);
+      const onFloor = Math.abs(hit.position.y) < 0.2 * camH;
+      const good = !!surf || (trackingStatus === 'NORMAL' && steady && onFloor);
+
       reticle.visible = true;
-      setCross(surf ? '#33dd66' : '#ffaa00', true);
+      setCross(good ? '#33dd66' : '#ffaa00', true);
       reticle.position.set(hit.position.x, hit.position.y, hit.position.z);
-      const dist = hit.distance || arCamera.position.distanceTo(reticle.position);
       reticle.scale.setScalar(Math.max(0.05, dist * 0.12) / 0.18); // roughly constant size on screen
       if (arCamera) reticle.quaternion.copy(arCamera.quaternion);   // always face the camera (never edge-on)
-      reticle.material.color.setHex(surf ? 0x33dd66 : 0xffaa00);   // green = surface, orange = weak
-      setInfo(`Tracking: ${trackingStatus} | ${surf ? 'SURFACE FOUND' : 'weak: feature point only'} | ${dist.toFixed(1)}${unit}`);
+      reticle.material.color.setHex(good ? 0x33dd66 : 0xffaa00);
+      const why = surf ? 'SURFACE' : (good ? 'floor point, steady' : (!onFloor ? 'not at floor height' : 'unsteady'));
+      setInfo(`Tracking: ${trackingStatus} | ${good ? 'OK' : 'weak'}: ${why}\n${hit.type} | dist ${dist.toFixed(1)}${unit} | y ${hit.position.y.toFixed(2)} | n ${results.length}`);
     }
 
     // ---- Pipeline event handlers ----
