@@ -63,6 +63,21 @@
   }, AR.reticle);
   const infoEl = document.getElementById('ios-ar-info');
 
+  // Fixed on-screen crosshair at the screen centre: always visible, colour = detection result
+  // (green = surface, orange = feature point only, red = nothing). Independent of the 3D scene.
+  let crossEl = null;
+  const setCross = (color, show) => {
+    if (!crossEl) {
+      crossEl = document.createElement('div');
+      crossEl.style.cssText = 'position:fixed;left:50%;top:50%;width:46px;height:46px;margin:-23px 0 0 -23px;' +
+        'border:4px solid #fff;border-radius:50%;z-index:2001;pointer-events:none;box-sizing:border-box;' +
+        'box-shadow:0 0 0 2px rgba(0,0,0,0.6), inset 0 0 0 2px rgba(0,0,0,0.6);display:none;';
+      document.body.appendChild(crossEl);
+    }
+    crossEl.style.borderColor = color;
+    crossEl.style.display = show ? 'block' : 'none';
+  };
+
   // THREE / GLTFLoader captured by an inline script in index.html BEFORE the
   // async 8th Wall engine can overwrite window.THREE.
   const T = window.__CAPTURED_THREE__;
@@ -300,6 +315,7 @@
       if (!RT.enabled || placed || anchored || !modelLoaded) {
         reticle.visible = false;
         lastCenterHit = null;
+        setCross('#fff', false);
         setInfo(`Tracking: ${trackingStatus}${placed ? ' | model placed' : ''}`);
         return;
       }
@@ -313,13 +329,16 @@
 
       if (!hit) {
         reticle.visible = false;
+        setCross('#ff3333', true);
         setInfo(`Tracking: ${trackingStatus} | no surface at the centre yet - move slowly`);
         return;
       }
       reticle.visible = true;
+      setCross(surf ? '#33dd66' : '#ffaa00', true);
       reticle.position.set(hit.position.x, hit.position.y, hit.position.z);
       const dist = hit.distance || arCamera.position.distanceTo(reticle.position);
-      reticle.scale.setScalar(Math.max(0.05, dist * 0.1) / 0.14); // roughly constant size on screen
+      reticle.scale.setScalar(Math.max(0.05, dist * 0.12) / 0.18); // roughly constant size on screen
+      if (arCamera) reticle.quaternion.copy(arCamera.quaternion);   // always face the camera (never edge-on)
       reticle.material.color.setHex(surf ? 0x33dd66 : 0xffaa00);   // green = surface, orange = weak
       setInfo(`Tracking: ${trackingStatus} | ${surf ? 'SURFACE FOUND' : 'weak: feature point only'} | ${dist.toFixed(1)}${unit}`);
     }
@@ -424,8 +443,8 @@
 
           // Reticle: flat ring that sits on whatever surface the engine finds at the screen centre
           reticle = new T.Mesh(
-            new T.RingGeometry(0.1, 0.14, 40).rotateX(-Math.PI / 2),
-            new T.MeshBasicMaterial({ color: 0x33dd66, transparent: true, opacity: 0.9,
+            new T.RingGeometry(0.12, 0.18, 48),
+            new T.MeshBasicMaterial({ color: 0x33dd66, transparent: true, opacity: 1,
                                       depthTest: false, side: T.DoubleSide })
           );
           reticle.renderOrder = 999;
@@ -452,7 +471,7 @@
             (gltf) => {
               clearInterval(stallCheckInterval);
               const model = gltf.scene;
-              model.scale.setScalar(CFG.model.scale);
+              model.scale.setScalar(CFG.model.scale * (AR.sizeMultiplier || 1));
               axisStateAR = Shared.bindAxes(model);
 
               // The model's lowest point must sit at Y = 0 (the detected floor), otherwise
@@ -598,6 +617,7 @@
     canvas.style.display = 'none';
     exitBtn.style.display = 'none';
     if (infoEl) infoEl.style.display = 'none';
+    setCross('#fff', false);
     if (rescanBtn) rescanBtn.style.display = 'none';
     hideOverlay();
     setAppUiVisible(true);

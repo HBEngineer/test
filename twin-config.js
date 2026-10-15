@@ -131,6 +131,10 @@ window.TWIN_CONFIG = {
     // a lower value makes the model look bigger, a higher value smaller.
     cameraHeight: 1.5,
 
+    // Extra size factor applied ONLY in iPhone AR (1 = as is, 2 = twice as big, 0.5 = half).
+    // Use it if the model looks too small/big whatever the camera height.
+    sizeMultiplier: 1,
+
     // true = lower the model so its lowest point sits exactly on the floor (Y = 0).
     // Marker positions below stay measured from the model's ORIGINAL origin.
     alignModelBase: true,
