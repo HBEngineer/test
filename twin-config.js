@@ -167,6 +167,14 @@ window.TWIN_CONFIG = {
       //   widthM: 0.42, position: [1.0, 0.8, 0], rotationDeg: [0, 90, 0] }
     ],
 
+    // Surface feedback while looking for a place to put the model
+    reticle: {
+      enabled: true,            // circle at the screen centre: green = surface found, orange = weak (feature point only)
+      showInfo: true,           // small text at the bottom: tracking status + result + distance
+      tapPlacesAtReticle: true, // true = a tap places the model where the circle is (what you see is what you get)
+      everyNFrames: 3           // test every N frames (higher = lighter on the phone)
+    },
+
     debug: false               // true = draw small axes at each marker position on the model
   }
 };

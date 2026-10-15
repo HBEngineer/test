@@ -55,6 +55,13 @@
     deadbandDeg: 0.5
   }, AR.markerOptions);
   const MARKER_CFGS = AR.markers || [];
+  const RT = Object.assign({
+    enabled: true,            // circle at the screen centre showing what the engine finds there
+    everyNFrames: 3,          // how often to test (higher = lighter on the phone)
+    showInfo: true,           // small text with tracking status + surface result
+    tapPlacesAtReticle: true  // true = a tap places the model where the circle is
+  }, AR.reticle);
+  const infoEl = document.getElementById('ios-ar-info');
 
   // THREE / GLTFLoader captured by an inline script in index.html BEFORE the
   // async 8th Wall engine can overwrite window.THREE.
@@ -130,6 +137,9 @@
     let normalSince = null;
     let lastReady = false;
     let touchHandler = null;
+    let reticle = null;          // circle drawn on the detected surface
+    let lastCenterHit = null;    // latest hit-test result at the screen centre
+    let frameCount = 0;
     const visible = new Map();   // markers currently in view: name -> { m, d }
 
     const nowMs = () => performance.now();
@@ -151,9 +161,10 @@
         return;
       }
       if (isReady()) {
-        setOverlayText(hasMarkers()
-          ? 'Tap the floor to place the model, or point at a marker'
-          : 'Tap the floor to place the model');
+        const tapMsg = RT.enabled
+          ? 'Aim the circle at the floor. Green = surface found. Then tap.'
+          : 'Tap the floor to place the model';
+        setOverlayText(hasMarkers() ? tapMsg + ' Or point at a marker.' : tapMsg);
       } else {
         setOverlayText(hasMarkers()
           ? 'Move your phone slowly to scan the floor, or point at a marker'
@@ -275,6 +286,42 @@
       }
     }
 
+    // ---- Surface feedback: circle + info text ----
+    function setInfo(text) {
+      if (infoEl && RT.showInfo) infoEl.innerText = text;
+    }
+
+    function updateReticle() {
+      if (!reticle) return;
+      const unit = AR.scale === 'absolute' ? ' m' : '';
+
+      if (!RT.enabled || placed || anchored || !modelLoaded) {
+        reticle.visible = false;
+        lastCenterHit = null;
+        setInfo(`Tracking: ${trackingStatus}${placed ? ' | model placed' : ''}`);
+        return;
+      }
+      if ((++frameCount % Math.max(1, RT.everyNFrames)) !== 0) return;
+
+      let results = [];
+      try { results = XR8.XrController.hitTest(0.5, 0.5, ['FEATURE_POINT']) || []; } catch (e) { results = []; }
+      const surf = results.find((h) => h.type === 'DETECTED_SURFACE' || h.type === 'ESTIMATED_SURFACE');
+      const hit = surf || results[0] || null;
+      lastCenterHit = hit;
+
+      if (!hit) {
+        reticle.visible = false;
+        setInfo(`Tracking: ${trackingStatus} | no surface at the centre yet - move slowly`);
+        return;
+      }
+      reticle.visible = true;
+      reticle.position.set(hit.position.x, hit.position.y, hit.position.z);
+      const dist = hit.distance || arCamera.position.distanceTo(reticle.position);
+      reticle.scale.setScalar(Math.max(0.05, dist * 0.1) / 0.14); // roughly constant size on screen
+      reticle.material.color.setHex(surf ? 0x33dd66 : 0xffaa00);   // green = surface, orange = weak
+      setInfo(`Tracking: ${trackingStatus} | ${surf ? 'SURFACE FOUND' : 'weak: feature point only'} | ${dist.toFixed(1)}${unit}`);
+    }
+
     // ---- Pipeline event handlers ----
     const onTrackingStatus = ({ detail }) => {
       trackingStatus = detail.status;
@@ -360,6 +407,18 @@
           arGroup.visible = false;
           scene.add(arGroup);
 
+          // Reticle: flat ring that sits on whatever surface the engine finds at the screen centre
+          reticle = new T.Mesh(
+            new T.RingGeometry(0.1, 0.14, 40).rotateX(-Math.PI / 2),
+            new T.MeshBasicMaterial({ color: 0x33dd66, transparent: true, opacity: 0.9,
+                                      depthTest: false, side: T.DoubleSide })
+          );
+          reticle.renderOrder = 999;
+          reticle.visible = false;
+          scene.add(reticle);
+          lastCenterHit = null;
+          frameCount = 0;
+
           // Debug: draw axes where the config says each marker sits on the model
           if (AR.debug) {
             markerData.forEach((m) => {
@@ -419,6 +478,10 @@
               showOverlay();
               return;
             }
+            if (RT.enabled && RT.tapPlacesAtReticle && lastCenterHit) {
+              placeAt(lastCenterHit); // place exactly where the circle is
+              return;
+            }
             const { width, height } = getViewportSize();
             const results = XR8.XrController.hitTest(
               e.touches[0].clientX / width,
@@ -451,6 +514,7 @@
           refreshOverlay();
         }
         updateMarkerAnchor();
+        updateReticle();
       }
     };
   };
@@ -463,6 +527,7 @@
     setAppUiVisible(false);
     canvas.style.display = 'block';
     exitBtn.style.display = 'block';
+    if (infoEl && RT.showInfo) infoEl.style.display = 'block';
     if (rescanBtn) rescanBtn.style.display = 'block';
     setOverlayText('Starting AR...');
     showOverlay();
@@ -505,6 +570,7 @@
     if (window.XR8 && XR8.stop) XR8.stop();
     canvas.style.display = 'none';
     exitBtn.style.display = 'none';
+    if (infoEl) infoEl.style.display = 'none';
     if (rescanBtn) rescanBtn.style.display = 'none';
     hideOverlay();
     setAppUiVisible(true);
